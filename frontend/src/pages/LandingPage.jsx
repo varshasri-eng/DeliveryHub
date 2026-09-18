@@ -13,12 +13,10 @@ const FEATURES = [
 ];
 
 const CATEGORIES = [
-  { emoji: "🥬", name: "Vegetables" },
-  { emoji: "🍎", name: "Fruits" },
-  { emoji: "🌶️", name: "Spices" },
-  { emoji: "🥛", name: "Dairy" },
-  { emoji: "🍚", name: "Rice & Dal" },
-  { emoji: "🫙", name: "Pickles & Snacks" },
+  { emoji: "🐐", name: "Goat" },
+  { emoji: "🍗", name: "Chicken" },
+  { emoji: "🥩", name: "Lamb" },
+  { emoji: "🐟", name: "Seafood" },
 ];
 
 export default function LandingPage() {

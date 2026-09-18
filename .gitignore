@@ -167,3 +167,7 @@ Thumbs.db
 # Editor
 .vscode/
 .idea/
+
+# Local backups made during manual server work — not source
+*.backup
+backup_before_wipe_*.sql

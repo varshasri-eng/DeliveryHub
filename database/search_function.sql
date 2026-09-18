@@ -1,4 +1,4 @@
--- ============================================================
+-- =============================================================
 -- search_products() — the actual search entry point
 -- ============================================================
 -- Combines three things that were previously separate:
@@ -28,13 +28,10 @@ DECLARE
     v_row_count       INT;
     v_top_product_id  INT;
 BEGIN
-    -- Main ranked result set: official/alias/regional beat hashtag/typo
-    -- at equal similarity; within the same term_type, closer matches
-    -- (higher trigram similarity) come first.
     RETURN QUERY
     SELECT
-        p.product_id,
-        p.product_name,
+        p.id,
+        p.name,
         st.search_term,
         st.term_type,
         CASE st.term_type
@@ -47,7 +44,7 @@ BEGIN
         END::INT AS match_rank,
         similarity(st.search_term, p_query) AS similarity_score
     FROM search_terms st
-    JOIN products p ON p.product_id = st.product_id
+    JOIN products p ON p.id = st.product_id
     WHERE st.search_term % p_query
        OR st.search_term ILIKE '%' || p_query || '%'
     ORDER BY match_rank ASC, similarity_score DESC
@@ -55,15 +52,10 @@ BEGIN
 
     GET DIAGNOSTICS v_row_count = ROW_COUNT;
 
-    -- Figure out the single top match for logging purposes.
-    -- (Re-queries rather than reusing the result set above — fine at this
-    -- data size; if this ever becomes a bottleneck it's a sign the project
-    -- has outgrown Postgres-only search and it's time for the
-    -- Typesense/Meilisearch layer from the main proposal.)
     IF v_row_count > 0 THEN
-        SELECT p.product_id INTO v_top_product_id
+        SELECT p.id INTO v_top_product_id
         FROM search_terms st
-        JOIN products p ON p.product_id = st.product_id
+        JOIN products p ON p.id = st.product_id
         WHERE st.search_term % p_query
            OR st.search_term ILIKE '%' || p_query || '%'
         ORDER BY
@@ -79,7 +71,15 @@ BEGIN
         LIMIT 1;
     END IF;
 
-    INSERT INTO search_logs (search_query, matched_product_id, result_found)
-    VALUES (p_query, v_top_product_id, v_row_count > 0);
+    INSERT INTO search_logs (
+        search_query,
+        matched_product_id,
+        result_found
+    )
+    VALUES (
+        p_query,
+        v_top_product_id,
+        v_row_count > 0
+    );
 END;
 $$ LANGUAGE plpgsql;

@@ -1,70 +1,82 @@
 services:
 
-  # ─────────────────────────────────────────────
-  # PostgreSQL — feature database
-  # ─────────────────────────────────────────────
   postgres:
     image: postgres:16-alpine
-    container_name: s2h_order_postgres
+    container_name: meat_delivery_postgres
     restart: unless-stopped
+
     environment:
       POSTGRES_DB: ${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+
     ports:
-      - "5434:5432"
+      - "5435:5432"
+
     volumes:
-      - s2h_order_pgdata:/var/lib/postgresql/data
+      - meat_delivery_pgdata:/var/lib/postgresql/data
       - ./db/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
+
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"
+        ]
       interval: 10s
       timeout: 5s
       retries: 5
 
-  # ─────────────────────────────────────────────
-  # Flask — feature backend
-  # ─────────────────────────────────────────────
+
   backend:
     build: ./backend
-    container_name: s2h_order_backend
+    container_name: meat_delivery_backend
     restart: unless-stopped
+
     environment:
       DATABASE_URL: ${DATABASE_URL}
       FLASK_ENV: ${FLASK_ENV}
       FLASK_SECRET_KEY: ${FLASK_SECRET_KEY}
       FLASK_APP: wsgi.py
       FRONTEND_URL: ${FRONTEND_URL}
+
       SMTP_HOST: ${SMTP_HOST}
       SMTP_PORT: ${SMTP_PORT}
       SMTP_USERNAME: ${SMTP_USERNAME}
       SMTP_PASSWORD: ${SMTP_PASSWORD}
       SMTP_FROM: ${SMTP_FROM}
+
     ports:
-      - "5002:5000"
+      - "5003:5000"
+
     volumes:
       - ./backend:/app
+
     depends_on:
       postgres:
         condition: service_healthy
+
     command: python wsgi.py
 
-  # ─────────────────────────────────────────────
-  # React — feature portal
-  # ─────────────────────────────────────────────
+
   frontend:
     build: ./frontend
-    container_name: s2h_order_frontend
+    container_name: meat_delivery_frontend
     restart: unless-stopped
+
     environment:
       VITE_API_URL: ""
+
     ports:
-      - "4001:3000"
+      - "4002:3000"
+
     volumes:
       - ./frontend:/app
       - /app/node_modules
+
     depends_on:
       - backend
 
+
 volumes:
-  s2h_order_pgdata:
+  meat_delivery_pgdata:

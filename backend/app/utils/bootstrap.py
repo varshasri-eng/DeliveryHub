@@ -42,10 +42,19 @@ def slugify(value):
 
 
 def seed_catalog():
-    """Upsert categories + products from the merged catalog (idempotent)."""
+    """Upsert categories + products from the merged catalog.
+
+    Safe to run repeatedly:
+      - categories are matched by slug
+      - products are matched by slug first, then by name + category
+      - existing products are updated instead of inserted again
+    """
     categories = {}
+
+    # ── CATEGORIES ─────────────────────────────────────────────
     for cat in CATALOG:
         obj = Category.query.filter_by(slug=cat["slug"]).first()
+
         if not obj:
             obj = Category(
                 name=cat["category"],
@@ -54,17 +63,45 @@ def seed_catalog():
             )
             db.session.add(obj)
             db.session.flush()
+        else:
+            # Keep category metadata synchronized with catalog_data.py
+            obj.name = cat["category"]
+            obj.display_order = cat["display_order"]
+
         categories[cat["category"]] = obj
 
+    # ── PRODUCTS ───────────────────────────────────────────────
     for name, category, emoji, price, unit, diet, description in PRODUCTS:
         cat = categories[category]
-        product = Product.query.filter_by(
-            name=name, category_id=cat.id
-        ).first()
+        slug = slugify(name)
+
+        # First try the canonical unique slug.
+        product = Product.query.filter_by(slug=slug).first()
+
+        # Fallback for older database records.
         if not product:
+            product = Product.query.filter_by(
+                name=name,
+                category_id=cat.id,
+            ).first()
+
+        if product:
+            # Existing product — synchronize catalog fields.
+            product.name = name
+            product.slug = slug
+            product.category_id = cat.id
+            product.price = price
+            product.unit = unit
+            product.emoji = emoji
+            product.diet = diet
+            product.description = description
+
+            # Do not overwrite inventory or admin-controlled state.
+            # stock_quantity remains unchanged.
+        else:
             product = Product(
                 name=name,
-                slug=slugify(name),
+                slug=slug,
                 category_id=cat.id,
                 price=price,
                 unit=unit,
@@ -75,7 +112,8 @@ def seed_catalog():
                 is_featured=True,
             )
             db.session.add(product)
-            db.session.flush()
+
+        db.session.flush()
 
     db.session.commit()
 
