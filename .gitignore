@@ -171,3 +171,6 @@ Thumbs.db
 # Local backups made during manual server work — not source
 *.backup
 backup_before_wipe_*.sql
+
+# Uploaded media — lives on the server, not in git history
+backend/app/static/uploads/

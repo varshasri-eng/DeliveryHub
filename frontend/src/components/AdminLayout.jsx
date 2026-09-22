@@ -83,6 +83,9 @@ export default function AdminLayout() {
           <NavLink to="/admin/payment-settings" className={navClass}>
             <FiCreditCard /> Payment Settings
           </NavLink>
+          <NavLink to="/admin/pages" className={navClass}>
+            Pages
+          </NavLink>
         </nav>
 
         {/* Logout */}

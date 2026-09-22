@@ -15,3 +15,4 @@ from app.models.delivery_rule import ProductDeliveryRule
 from app.models.invoice import Invoice
 
 from app.models.invoice_item import InvoiceItem
+from app.models.static_page import StaticPage

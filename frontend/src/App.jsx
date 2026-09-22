@@ -40,6 +40,8 @@ import DeliveryRules from "./pages/admin/DeliveryRules";
 import CustomerLayout from "./components/CustomerLayout";
 import AdminLayout    from "./components/AdminLayout";
 import GuestLayout    from "./components/GuestLayout";
+import PageView from "./pages/PageView";
+import AdminPages from "./pages/admin/AdminPages";
 
 const Loader = () => (
   <div className="flex items-center justify-center h-screen text-gray-400">
@@ -80,6 +82,7 @@ export default function App() {
           <Route path="/shop"     element={<ShopPage />} />
           <Route path="/shop/:id" element={<GuestProductDetailPage />} />
           <Route path="/checkout" element={<GuestCheckoutPage />} />
+          <Route path="/pages/:slug" element={<PageView />} />
         </Route>
 
         {/* ── Customer auth ──────────────────────────── */}
@@ -120,6 +123,7 @@ export default function App() {
           <Route path="payment-settings" element={<PaymentSettingsPage />} />
           <Route path="orders" element={<AdminOrders />} />
           <Route path="delivery-rules" element={<DeliveryRules />} />
+          <Route path="pages" element={<AdminPages />} />
         </Route>
 
         {/* ── Defaults ────────────────────────────────── */}

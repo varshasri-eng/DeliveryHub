@@ -63,7 +63,8 @@ PAYMENT_SCREENSHOT_MAX_BYTES = 5 * 1024 * 1024  # 5 MB
 
 VALID_ORDER_TYPES = {"delivery", "pickup"}
 VALID_TIME_SLOTS = {"Morning 9-12", "Afternoon 12-4", "Evening 4-7"}
-DEFAULT_DELIVERY_FEE = 2.99
+DEFAULT_DELIVERY_FEE = 5.00
+FREE_DELIVERY_THRESHOLD = 50.00
 
 
 def _delivery_fee_for(zip_code):
@@ -406,6 +407,8 @@ def create_order(customer):
 
         address_id = link.address_id
         delivery_fee = _delivery_fee_for(link.address.zip_code)
+        if subtotal >= FREE_DELIVERY_THRESHOLD:
+            delivery_fee = 0.0
 
     discount = round(float(data.get("discount_amount") or 0), 2)
     total = round(subtotal + delivery_fee - discount, 2)
@@ -560,6 +563,8 @@ def create_guest_order():
 
         address_id = addr.id
         delivery_fee = _delivery_fee_for(zip_code)
+        if subtotal >= FREE_DELIVERY_THRESHOLD:
+            delivery_fee = 0.0
 
     discount = round(float(data.get("discount_amount") or 0), 2)
     total = round(subtotal + delivery_fee - discount, 2)

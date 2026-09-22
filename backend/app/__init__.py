@@ -39,6 +39,7 @@ def create_app():
     from app.routes.households import households_bp
     from app.routes.settings import settings_bp
     from app.routes.payment_settings import payment_settings_bp
+    from app.routes.pages import pages_bp, admin_pages_bp
 
     app.register_blueprint(auth_bp,       url_prefix="/api/auth")
     app.register_blueprint(customers_bp,  url_prefix="/api/customers")
@@ -52,6 +53,8 @@ def create_app():
     # (see payment_settings.py), PUT is admin-gated on the same path
     # via @admin_required, not a separate /admin/... prefix.
     app.register_blueprint(payment_settings_bp, url_prefix="/api/payment-settings")
+    app.register_blueprint(pages_bp,       url_prefix="/api/pages")
+    app.register_blueprint(admin_pages_bp, url_prefix="/api/admin/pages")
 
     # create missing tables + seed the catalog (idempotent)
     with app.app_context():
