@@ -6,9 +6,9 @@ import {
 import { useBranding } from "../context/BrandingContext";
 
 const FEATURES = [
-  { icon: <FiTruck size={22} />, title: "Fast Delivery", desc: "Same-day delivery in Lathrop & Mountain House" },
+  { icon: <FiTruck size={22} />, title: "Fast Delivery", desc: "Same-day delivery across our six-city service area" },
   { icon: <FiSearch size={22} />, title: "Multilingual Search", desc: "Search in English, Telugu, Hindi or Tamil" },
-  { icon: <FiShield size={22} />, title: "Fresh Guarantee", desc: "Farm-fresh groceries, quality checked" },
+  { icon: <FiShield size={22} />, title: "Fresh Guarantee", desc: "Fresh cuts, quality checked" },
   { icon: <FiClock size={22} />, title: "Flexible Slots", desc: "Choose morning, afternoon or evening delivery" },
 ];
 
@@ -44,7 +44,7 @@ export default function LandingPage() {
             <div className="inline-flex items-center gap-2 bg-white/90 text-brand-700
                             text-xs font-semibold px-3 py-1.5 rounded-full mb-5">
               <FiPackage size={13} />
-              Serving Lathrop & Mountain House
+              Serving Dublin, San Ramon, Pleasanton, Livermore, Lathrop &amp; Manteca
             </div>
             <h1 className="text-3xl sm:text-5xl font-extrabold text-white drop-shadow-sm
                            leading-[1.1] tracking-tight max-w-3xl">
@@ -77,7 +77,7 @@ export default function LandingPage() {
             <div className="inline-flex items-center gap-2 bg-brand-100/70 text-brand-700
                             text-xs font-semibold px-3 py-1.5 rounded-full mb-5">
               <FiPackage size={13} />
-              Serving Lathrop & Mountain House
+              Serving Dublin, San Ramon, Pleasanton, Livermore, Lathrop &amp; Manteca
             </div>
             <h1 className="text-4xl sm:text-5xl lg:text-6xl font-extrabold text-gray-900
                            leading-[1.1] tracking-tight">
@@ -151,7 +151,7 @@ export default function LandingPage() {
       <section className="bg-gray-50 py-16">
         <div className="max-w-6xl mx-auto px-4 sm:px-6">
           <h2 className="text-2xl font-bold text-gray-900 text-center mb-10">
-            Why Store2Home?
+            Why TajaMeat?
           </h2>
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
             {FEATURES.map((f) => (

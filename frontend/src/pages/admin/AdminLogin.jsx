@@ -52,7 +52,7 @@ export default function AdminLogin() {
           <div className="w-10 h-10 bg-brand-500 rounded-xl flex items-center justify-center">
             <FiShield className="text-white text-lg" />
           </div>
-          <span className="text-white font-bold text-xl">Store2Home</span>
+          <span className="text-white font-bold text-xl">TajaMeat</span>
         </div>
 
         <div>
@@ -61,7 +61,7 @@ export default function AdminLogin() {
           </h1>
           <p className="text-gray-400 text-lg leading-relaxed">
             Manage customers, products, inventory and orders
-            for Lathrop and Mountain House delivery operations.
+            for our Dublin, San Ramon, Pleasanton, Livermore, Lathrop &amp; Manteca delivery operations.
           </p>
         </div>
 
@@ -89,7 +89,7 @@ export default function AdminLogin() {
             <div className="w-9 h-9 bg-brand-500 rounded-xl flex items-center justify-center">
               <FiShield className="text-white" />
             </div>
-            <span className="text-white font-bold text-lg">Store2Home Staff</span>
+            <span className="text-white font-bold text-lg">TajaMeat Staff</span>
           </div>
 
           <h2 className="text-2xl font-bold text-white mb-1">Sign in</h2>
@@ -125,7 +125,7 @@ export default function AdminLogin() {
                              pl-9 pr-4 py-2.5 text-white text-sm placeholder-gray-500
                              focus:outline-none focus:ring-2 focus:ring-brand-500
                              focus:border-transparent"
-                  placeholder="staff@store2home.com"
+                  placeholder="staff@tajameat.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   autoFocus

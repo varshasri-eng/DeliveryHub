@@ -45,7 +45,7 @@ export default function AdminRegister() {
           <div className="w-10 h-10 bg-brand-500 rounded-xl flex items-center justify-center">
             <FiShield className="text-white text-lg" />
           </div>
-          <span className="text-white font-bold text-xl">Store2Home</span>
+          <span className="text-white font-bold text-xl">TajaMeat</span>
         </div>
 
         <div>
@@ -88,7 +88,7 @@ export default function AdminRegister() {
             <div className="w-9 h-9 bg-brand-500 rounded-xl flex items-center justify-center">
               <FiShield className="text-white" />
             </div>
-            <span className="text-white font-bold text-lg">Store2Home Staff</span>
+            <span className="text-white font-bold text-lg">TajaMeat Staff</span>
           </div>
 
           {submitted ? (

@@ -196,7 +196,7 @@ export default function PaymentSettingsPage() {
               <textarea
                 value={instructions}
                 onChange={(e) => setInstructions(e.target.value)}
-                placeholder="e.g. Pay to UPI ID: store2home@okaxis, or Zelle: Delivery Hub LLC"
+                placeholder="e.g. Pay to UPI ID: tajameat@okaxis, or Zelle: Delivery Hub LLC"
                 className="w-full px-3 py-2.5 border border-gray-200 rounded-xl
                            text-sm outline-none focus:ring-2 focus:ring-brand-100 h-24 resize-none"
               />

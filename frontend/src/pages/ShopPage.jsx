@@ -6,6 +6,7 @@ import {
 } from "react-icons/fi";
 import { getProducts, getCategories } from "../api/products";
 import { useBranding } from "../context/BrandingContext";
+import { resolveMediaUrl } from "../utils/media";
 
 // Dispatched after every cart mutation so GuestLayout's header badge
 // (which lives outside this component) stays in sync — see
@@ -270,8 +271,17 @@ export default function ShopPage() {
                     onClick={() => navigate(`/shop/${p.id}`)}>
                     <div className="flex items-start justify-between mb-3">
                       <span className="w-14 h-14 rounded-xl bg-gradient-to-br from-brand-50 to-brand-100
-                                       flex items-center justify-center text-3xl">
-                        {p.emoji || "🛒"}
+                                       flex items-center justify-center text-3xl overflow-hidden">
+                        {p.image_url ? (
+                          <img
+                            src={resolveMediaUrl(p.image_url)}
+                            alt={p.name}
+                            className="w-full h-full object-cover"
+                            onError={(e) => { e.currentTarget.style.display = "none"; }}
+                          />
+                        ) : (
+                          p.emoji || "🛒"
+                        )}
                       </span>
                       <span
                         className={`w-4 h-4 rounded-[4px] border-2 flex items-center justify-center flex-shrink-0

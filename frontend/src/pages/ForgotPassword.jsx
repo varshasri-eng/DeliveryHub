@@ -33,7 +33,7 @@ export default function ForgotPassword() {
                           bg-brand-500 rounded-2xl mb-4 shadow-lg">
             <FiHome className="text-white text-2xl" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">Store2Home</h1>
+          <h1 className="text-2xl font-bold text-gray-900">TajaMeat</h1>
         </div>
 
         <div className="card">

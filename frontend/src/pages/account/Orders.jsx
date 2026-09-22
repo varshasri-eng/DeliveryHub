@@ -335,7 +335,7 @@ function InvoiceModal({ order, paymentSettings, onClose, onPrint, onPaymentSubmi
 
         {/* Invoice */}
         <div
-          id="store2home-invoice"
+          id="tajameat-invoice"
           className="p-8 text-gray-900 bg-white"
         >
           {/* Header */}
@@ -529,7 +529,7 @@ function InvoiceModal({ order, paymentSettings, onClose, onPrint, onPaymentSubmi
           >
             <div>
               <p className="font-semibold text-sm">
-                Thank you for shopping with Store2Home!
+                Thank you for shopping with TajaMeat!
               </p>
 
               <p className="text-xs text-gray-500 mt-1">
@@ -541,7 +541,7 @@ function InvoiceModal({ order, paymentSettings, onClose, onPrint, onPaymentSubmi
             </div>
 
             <div className="text-right text-xs text-gray-400">
-              <p>Store2Home</p>
+              <p>TajaMeat</p>
               <p>Grocery Order Invoice</p>
             </div>
           </div>

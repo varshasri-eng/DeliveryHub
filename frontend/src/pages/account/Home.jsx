@@ -15,6 +15,7 @@ import { createOrder } from "../../api/orders";
 import { getAddresses } from "../../api/customers";
 import { useAuth } from "../../context/AuthContext";
 import { useBranding } from "../../context/BrandingContext";
+import { resolveMediaUrl } from "../../utils/media";
 
 const TIME_SLOTS = ["Morning 9-12", "Afternoon 12-4", "Evening 4-7"];
 
@@ -160,7 +161,7 @@ export default function Home() {
         <div>
           <h1 className="text-2xl font-bold text-gray-900">Welcome back 👋</h1>
           <p className="text-gray-500 text-sm mt-0.5">
-            Fresh groceries, delivered in Lathrop &amp; Mountain House
+            Fresh cuts, delivered in Dublin, San Ramon, Pleasanton, Livermore, Lathrop &amp; Manteca
           </p>
         </div>
         <button
@@ -294,8 +295,17 @@ export default function Home() {
                   onClick={() => navigate(`/account/products/${p.id}`)}>
                   <div className="flex items-start justify-between mb-3">
                     <span className="w-14 h-14 rounded-xl bg-gradient-to-br from-brand-50 to-brand-100
-                                     flex items-center justify-center text-3xl">
-                      {p.emoji || "🛒"}
+                                     flex items-center justify-center text-3xl overflow-hidden">
+                      {p.image_url ? (
+                        <img
+                          src={resolveMediaUrl(p.image_url)}
+                          alt={p.name}
+                          className="w-full h-full object-cover"
+                          onError={(e) => { e.currentTarget.style.display = "none"; }}
+                        />
+                      ) : (
+                        p.emoji || "🛒"
+                      )}
                     </span>
                     {/* Veg / non-veg mark */}
                     <span
