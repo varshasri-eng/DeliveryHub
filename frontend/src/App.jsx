@@ -4,9 +4,6 @@ import { BrandingProvider } from "./context/BrandingContext";
 
 // Public pages
 import LandingPage from "./pages/LandingPage";
-import ShopPage from "./pages/ShopPage";
-import GuestProductDetailPage from "./pages/GuestProductDetailPage";
-import GuestCheckoutPage from "./pages/GuestCheckoutPage";
 
 // Auth pages
 import Login         from "./pages/Login";
@@ -20,28 +17,29 @@ import AdminRegister from "./pages/admin/AdminRegister";
 import Home          from "./pages/account/Home";
 import Profile       from "./pages/account/Profile";
 import Addresses     from "./pages/account/Addresses";
-import Orders        from "./pages/account/Orders";
+import Shipments from "./pages/account/Shipments";
 import FamilyGroup   from "./pages/account/FamilyGroup";
 import Notifications from "./pages/account/Notifications";
 import Settings      from "./pages/account/Settings";
-import ProductDetailsPage from "./pages/account/ProductDetailsPage";
 
 // Admin pages
 import CustomerList    from "./pages/admin/CustomerList";
 import CustomerDetail  from "./pages/admin/CustomerDetail";
 import StaffManagement from "./pages/admin/StaffManagement";
-import SearchInsights  from "./pages/admin/SearchInsights";
 import AdminBrandingPage from "./pages/admin/AdminBrandingPage";
 import PaymentSettingsPage from "./pages/admin/PaymentSettingsPage";
-import AdminOrders from "./pages/admin/AdminOrders";
-import DeliveryRules from "./pages/admin/DeliveryRules";
 
 // Layouts
 import CustomerLayout from "./components/CustomerLayout";
 import AdminLayout    from "./components/AdminLayout";
 import GuestLayout    from "./components/GuestLayout";
 import PageView from "./pages/PageView";
+import ServicesPage from "./pages/ServicesPage";
+import ServiceDetailPage from "./pages/ServiceDetailPage";
+import BookShipmentPage from "./pages/BookShipmentPage";
 import AdminPages from "./pages/admin/AdminPages";
+import AdminShipments from "./pages/admin/AdminShipments";
+import AdminServices from "./pages/admin/AdminServices";
 
 const Loader = () => (
   <div className="flex items-center justify-center h-screen text-gray-400">
@@ -79,10 +77,10 @@ export default function App() {
         {/* ── Public (no auth) ───────────────────────── */}
         <Route element={<GuestLayout />}>
           <Route path="/"          element={<LandingPage />} />
-          <Route path="/shop"     element={<ShopPage />} />
-          <Route path="/shop/:id" element={<GuestProductDetailPage />} />
-          <Route path="/checkout" element={<GuestCheckoutPage />} />
           <Route path="/pages/:slug" element={<PageView />} />
+          <Route path="/services" element={<ServicesPage />} />
+          <Route path="/services/:slug" element={<ServiceDetailPage />} />
+          <Route path="/services/:slug/book" element={<BookShipmentPage />} />
         </Route>
 
         {/* ── Customer auth ──────────────────────────── */}
@@ -97,10 +95,9 @@ export default function App() {
         }>
           <Route index element={<Navigate to="home" replace />} />
           <Route path="home"          element={<Home />} />
-          <Route path="products/:id"  element={<ProductDetailsPage />} />
           <Route path="profile"       element={<Profile />} />
           <Route path="addresses"     element={<Addresses />} />
-          <Route path="orders"        element={<Orders />} />
+          <Route path="shipments" element={<Shipments />} />
           <Route path="family"        element={<FamilyGroup />} />
           <Route path="notifications" element={<Notifications />} />
           <Route path="settings"      element={<Settings />} />
@@ -118,11 +115,10 @@ export default function App() {
           <Route path="customers"     element={<CustomerList />} />
           <Route path="customers/:id" element={<CustomerDetail />} />
           <Route path="staff"         element={<StaffManagement />} />
-          <Route path="search"        element={<SearchInsights />} />
           <Route path="branding"      element={<AdminBrandingPage />} />
           <Route path="payment-settings" element={<PaymentSettingsPage />} />
-          <Route path="orders" element={<AdminOrders />} />
-          <Route path="delivery-rules" element={<DeliveryRules />} />
+          <Route path="shipments" element={<AdminShipments />} />
+          <Route path="services" element={<AdminServices />} />
           <Route path="pages" element={<AdminPages />} />
         </Route>
 

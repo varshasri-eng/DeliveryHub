@@ -3,7 +3,7 @@ import { useParams, useNavigate } from "react-router-dom";
 import {
   getCustomer, editCustomer, deactivateCustomer,
   activateCustomer,
-  getCustomerAddresses, getCustomerOrders,
+  getCustomerAddresses, getCustomerShipments,
 } from "../../api/admin";
 import toast from "react-hot-toast";
 import {
@@ -22,12 +22,12 @@ export default function CustomerDetail() {
 
   const [customer, setCustomer]   = useState(null);
   const [addresses, setAddresses] = useState([]);
-  const [orders, setOrders]       = useState([]);
+  const [shipments, setShipments] = useState([]);
   const [loading, setLoading]     = useState(true);
   const [editing, setEditing]     = useState(false);
   const [saving, setSaving]       = useState(false);
   const [form, setForm]           = useState({});
-  const [tab, setTab]             = useState("profile"); // profile | addresses | orders
+  const [tab, setTab]             = useState("profile"); // profile | addresses | shipments
 
   const loadCustomer = () =>
     getCustomer(id)
@@ -38,7 +38,7 @@ export default function CustomerDetail() {
     Promise.all([
       loadCustomer(),
       getCustomerAddresses(id).then((r) => setAddresses(r.data.addresses)).catch(() => {}),
-      getCustomerOrders(id).then((r) => setOrders(r.data.orders)).catch(() => {}),
+      getCustomerShipments(id).then((r) => setShipments(r.data.shipments)).catch(() => {}),
     ]).finally(() => setLoading(false));
   }, [id]);
 
@@ -145,7 +145,7 @@ export default function CustomerDetail() {
         {[
           { key: "profile",   label: "Profile",   icon: <FiUser size={13} /> },
           { key: "addresses", label: `Addresses (${addresses.length})`, icon: <FiMapPin size={13} /> },
-          { key: "orders",    label: `Orders (${orders.length})`,    icon: <FiShoppingBag size={13} /> },
+          { key: "shipments", label: `Shipments (${shipments.length})`, icon: <FiShoppingBag size={13} /> },
         ].map((t) => (
           <button key={t.key}
             onClick={() => setTab(t.key)}
@@ -283,32 +283,32 @@ export default function CustomerDetail() {
         </div>
       )}
 
-      {/* ── Orders tab ───────────────────────────────── */}
-      {tab === "orders" && (
+      {/* ── Shipments tab ────────────────────────────── */}
+      {tab === "shipments" && (
         <div>
-          {orders.length === 0 ? (
+          {shipments.length === 0 ? (
             <div className="card text-center py-10">
               <FiShoppingBag className="mx-auto text-gray-300 text-3xl mb-2" />
-              <p className="text-gray-400">No orders yet</p>
+              <p className="text-gray-400">No shipments yet</p>
             </div>
           ) : (
             <div className="space-y-3">
-              {orders.map((o) => (
-                <div key={o.id} className="card">
+              {shipments.map((s) => (
+                <div key={s.id} className="card">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="font-semibold text-gray-900">{o.order_number}</p>
+                      <p className="font-semibold text-gray-900">{s.shipment_number}</p>
                       <p className="text-xs text-gray-400">
-                        {new Date(o.created_at).toLocaleDateString()}
+                        {new Date(s.created_at).toLocaleDateString()}
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="font-semibold text-gray-900">${o.total_amount}</p>
+                      <p className="font-semibold text-gray-900">${s.total_price}</p>
                       <span className={`text-xs font-medium px-2 py-0.5 rounded-full capitalize
-                        ${o.status === "delivered"  ? "bg-green-100 text-green-700" :
-                          o.status === "cancelled"  ? "bg-red-100 text-red-700" :
+                        ${s.status === "delivered"  ? "bg-green-100 text-green-700" :
+                          s.status === "cancelled"  ? "bg-red-100 text-red-700" :
                           "bg-yellow-100 text-yellow-700"}`}>
-                        {o.status}
+                        {s.status}
                       </span>
                     </div>
                   </div>

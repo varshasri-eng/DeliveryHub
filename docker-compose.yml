@@ -2,7 +2,7 @@ services:
 
   postgres:
     image: postgres:16-alpine
-    container_name: meat_delivery_postgres
+    container_name: delivery_hub_postgres
     restart: unless-stopped
 
     environment:
@@ -11,10 +11,10 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
 
     ports:
-      - "5435:5432"
+      - "5440:5432"
 
     volumes:
-      - meat_delivery_pgdata:/var/lib/postgresql/data
+      - delivery_hub_pgdata:/var/lib/postgresql/data
       - ./db/schema.sql:/docker-entrypoint-initdb.d/01_schema.sql
 
     healthcheck:
@@ -30,7 +30,7 @@ services:
 
   backend:
     build: ./backend
-    container_name: meat_delivery_backend
+    container_name: delivery_hub_backend
     restart: unless-stopped
 
     environment:
@@ -47,7 +47,7 @@ services:
       SMTP_FROM: ${SMTP_FROM}
 
     ports:
-      - "5003:5000"
+      - "5010:5000"
 
     volumes:
       - ./backend:/app
@@ -61,14 +61,14 @@ services:
 
   frontend:
     build: ./frontend
-    container_name: meat_delivery_frontend
+    container_name: delivery_hub_frontend
     restart: unless-stopped
 
     environment:
       VITE_API_URL: ""
 
     ports:
-      - "4002:3000"
+      - "4010:3000"
 
     volumes:
       - ./frontend:/app
@@ -79,4 +79,4 @@ services:
 
 
 volumes:
-  meat_delivery_pgdata:
+  delivery_hub_pgdata:

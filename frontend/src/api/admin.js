@@ -22,8 +22,8 @@ export const changeRole = (id, role) =>
 export const getCustomerAddresses = (id) =>
   api.get(`/admin/customers/${id}/addresses`);
 
-export const getCustomerOrders = (id) =>
-  api.get(`/admin/customers/${id}/orders`);
+export const getCustomerShipments = (id) =>
+  api.get(`/admin/customers/${id}/shipments`);
 
 export const deleteCustomer = (id) =>
   api.delete(`/admin/customers/${id}`);
@@ -31,49 +31,76 @@ export const deleteCustomer = (id) =>
 export const getCustomerStats = () =>
   api.get("/admin/stats/customers");
 
-// ── Order management ──────────────────────────────────────────
-export const getAdminOrders = (params = {}) =>
-  api.get("/admin/orders", { params });
+// ── Shipment management ──────────────────────────────────────
+export const getAdminShipments = (params = {}) =>
+  api.get("/admin/shipments", { params });
 
-export const removeOrderItem = (orderId, itemId) =>
-  api.delete(`/admin/orders/${orderId}/items/${itemId}`);
+export const getAdminShipment = (id) =>
+  api.get(`/admin/shipments/${id}`);
 
-export const replaceOrderItem = (orderId, itemId, data) =>
-  api.put(`/admin/orders/${orderId}/items/${itemId}/replace`, data);
+export const updateShipmentStatus = (id, status) =>
+  api.put(`/admin/shipments/${id}/status`, { status });
 
-// ── Invoice management ───────────────────────────────────────
-// raiseOrderInvoice creates a brand new invoice (POST). It must be
-// called only on Save (never on Edit Invoice), and must carry the
-// discount/tax settings the admin chose in the invoice editor.
-export const raiseOrderInvoice = (orderId, data) =>
-  api.post(`/admin/orders/${orderId}/invoice`, data);
+// ── Invoice / billing ─────────────────────────────────────────
+export const raiseShipmentInvoice = (shipmentId) =>
+  api.post(`/admin/shipments/${shipmentId}/invoice`);
 
-// updateOrderInvoice updates an existing invoice (PUT).
-export const updateOrderInvoice = (orderId, data) =>
-  api.put(`/admin/orders/${orderId}/invoice`, data);
+export const verifyShipmentPayment = (invoiceId) =>
+  api.put(`/admin/shipments/invoices/${invoiceId}/verify`);
 
-// ── Payment verification (Phase 3) ────────────────────────────
-// Only valid when the invoice is currently "payment_submitted" —
-// see orders.js's submitPaymentProof for how it gets there.
-export const verifyOrderPayment = (orderId) =>
-  api.put(`/admin/orders/${orderId}/invoice/verify`);
+export const rejectShipmentPayment = (invoiceId, reason) =>
+  api.put(`/admin/shipments/invoices/${invoiceId}/reject`, { reason });
 
-export const rejectOrderPayment = (orderId, reason) =>
-  api.put(`/admin/orders/${orderId}/invoice/reject`, { reason });
+// ── Service management ────────────────────────────────────────
+export const listAdminServices = () =>
+  api.get("/admin/services");
 
-// ── Payment settings (Phase 3) ────────────────────────────────
+export const getAdminService = (id) =>
+  api.get(`/admin/services/${id}`);
+
+export const createService = (data) =>
+  api.post("/admin/services", data);
+
+export const updateService = (id, data) =>
+  api.put(`/admin/services/${id}`, data);
+
+export const deleteService = (id) =>
+  api.delete(`/admin/services/${id}`);
+
+export const addCoverageItem = (serviceId, data) =>
+  api.post(`/admin/services/${serviceId}/coverage`, data);
+export const updateCoverageItem = (itemId, data) =>
+  api.put(`/admin/coverage/${itemId}`, data);
+export const deleteCoverageItem = (itemId) =>
+  api.delete(`/admin/coverage/${itemId}`);
+
+export const addRestriction = (serviceId, data) =>
+  api.post(`/admin/services/${serviceId}/restrictions`, data);
+export const updateRestriction = (itemId, data) =>
+  api.put(`/admin/restrictions/${itemId}`, data);
+export const deleteRestriction = (itemId) =>
+  api.delete(`/admin/restrictions/${itemId}`);
+
+export const addPricingTier = (serviceId, data) =>
+  api.post(`/admin/services/${serviceId}/pricing-tiers`, data);
+export const updatePricingTier = (tierId, data) =>
+  api.put(`/admin/pricing-tiers/${tierId}`, data);
+export const deletePricingTier = (tierId) =>
+  api.delete(`/admin/pricing-tiers/${tierId}`);
+
+export const addField = (serviceId, data) =>
+  api.post(`/admin/services/${serviceId}/fields`, data);
+export const updateField = (fieldId, data) =>
+  api.put(`/admin/fields/${fieldId}`, data);
+export const deleteField = (fieldId) =>
+  api.delete(`/admin/fields/${fieldId}`);
+
+// ── Payment settings ───────────────────────────────────────────
 // The QR code + instructions shown on every invoice. Separate from
 // site branding — admin-managed payment info, not a branding asset.
-// NOTE: registered as a single blueprint/prefix (/api/payment-settings)
-// just like settings_bp — GET is public (api/settings.js), PUT here
-// is admin-gated server-side via @admin_required on the same path.
 export const updatePaymentSettings = (data) =>
   api.put("/payment-settings", data);
 
-// Uploads/replaces the QR image file itself. Always overwrites the
-// same underlying file on the backend — the returned settings.qr_code_url
-// carries a fresh cache-busting ?v= each time, so the new image shows
-// up immediately instead of a stale cached one.
 export const uploadPaymentQr = (file) => {
   const formData = new FormData();
   formData.append("qr", file);
@@ -85,18 +112,4 @@ export const uploadPaymentQr = (file) => {
 export const deletePaymentQr = () =>
   api.delete("/payment-settings/qr");
 
-// ── Delivery rules ──────────────────────────────────────────
-// Per-product restock cycle + minimum lead time, used by
-// /products/<id>/availability to compute earliest_delivery_date.
-export const getProductDeliveryRule = (productId) =>
-  api.get(`/admin/products/${productId}/delivery-rule`);
-
-export const updateProductDeliveryRule = (productId, data) =>
-  api.put(`/admin/products/${productId}/delivery-rule`, data);
-
-// ── Search insights ──────────────────────────────────────────
-export const getSearchLogs = (params = {}) =>
-  api.get("/admin/search-logs", { params });
-
-export const addSearchTerm = (data) =>
-  api.post("/admin/search-terms", data);
+// TEMP stub so CustomerDetail.jsx can load; remove once that page is fixed

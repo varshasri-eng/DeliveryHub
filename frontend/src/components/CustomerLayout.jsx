@@ -18,7 +18,7 @@ const NAV_ITEMS = [
     links: [
       { to: "/account/profile",   icon: <FiUser size={15} />,        label: "Profile" },
       { to: "/account/addresses", icon: <FiMapPin size={15} />,      label: "Addresses" },
-      { to: "/account/orders",    icon: <FiShoppingBag size={15} />, label: "Orders" },
+      { to: "/account/shipments", icon: <FiShoppingBag size={15} />, label: "Shipments" },
     ],
   },
   {

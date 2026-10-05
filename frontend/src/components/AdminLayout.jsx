@@ -65,17 +65,14 @@ export default function AdminLayout() {
           <NavLink to="/admin/customers" className={navClass}>
             <FiUsers /> Customers
           </NavLink>
-          <NavLink to="/admin/orders" className={navClass}>
-            <FiPackage /> Orders
+          <NavLink to="/admin/shipments" className={navClass}>
+            <FiPackage /> Shipments
           </NavLink>
-          <NavLink to="/admin/delivery-rules" className={navClass}>
-            <FiTruck /> Delivery Rules
+          <NavLink to="/admin/services" className={navClass}>
+            <FiTruck /> Services
           </NavLink>
           <NavLink to="/admin/staff" className={navClass}>
             <FiShield /> Staff
-          </NavLink>
-          <NavLink to="/admin/search" className={navClass}>
-            <FiSearch /> Search Insights
           </NavLink>
           <NavLink to="/admin/branding" className={navClass}>
             <FiDroplet /> Branding

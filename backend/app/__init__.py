@@ -21,21 +21,21 @@ def create_app():
             Customer, Address, CustomerAddress,
             Household, HouseholdMember,
             Session, OTPVerification,
-            Category, Product, DeliveryZone,
-            SiteSettings,
+            SiteSettings, PaymentSettings, StaticPage,
+            ServiceType, ServiceCoverageItem, ServiceRestriction,
+            ServicePricingTier, ServiceField,
+            Shipment, Invoice, InvoiceItem,
         )
-        from app.models.order import Order, OrderItem  # noqa: F401
-        from app.models.invoice import Invoice  # noqa: F401
-        from app.models.invoice_item import InvoiceItem  # noqa: F401
-        from app.models.payment_settings import PaymentSettings  # noqa: F401
 
     # Register blueprints
     from app.routes.auth import auth_bp
     from app.routes.customers import customers_bp
     from app.routes.admin import admin_bp
     from app.routes.staff import staff_bp
-    from app.routes.products import products_bp
-    from app.routes.orders import orders_bp
+    from app.routes.shipments import shipments_bp
+    from app.routes.services import services_bp
+    from app.routes.admin_services import admin_services_bp
+    from app.routes.admin_shipments import admin_shipments_bp
     from app.routes.households import households_bp
     from app.routes.settings import settings_bp
     from app.routes.payment_settings import payment_settings_bp
@@ -45,8 +45,10 @@ def create_app():
     app.register_blueprint(customers_bp,  url_prefix="/api/customers")
     app.register_blueprint(admin_bp,      url_prefix="/api/admin")
     app.register_blueprint(staff_bp,      url_prefix="/api/staff")
-    app.register_blueprint(products_bp,   url_prefix="/api/products")
-    app.register_blueprint(orders_bp,     url_prefix="/api/orders")
+    app.register_blueprint(shipments_bp,  url_prefix="/api/shipments")
+    app.register_blueprint(services_bp,   url_prefix="/api/services")
+    app.register_blueprint(admin_services_bp, url_prefix="/api/admin/services")
+    app.register_blueprint(admin_shipments_bp, url_prefix="/api/admin/shipments")
     app.register_blueprint(households_bp, url_prefix="/api/households")
     app.register_blueprint(settings_bp,   url_prefix="/api/settings")
     # Single prefix, mirroring settings_bp — GET is public
