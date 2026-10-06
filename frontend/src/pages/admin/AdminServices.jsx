@@ -66,7 +66,7 @@ function BulletListEditor({ title, items, onAdd, onUpdate, onDelete }) {
 
 /* ── Pricing tiers editor ── */
 function TiersEditor({ tiers, onAdd, onUpdate, onDelete }) {
-  const empty = { tier_name: "", duration_label: "", price: "", icon: "" };
+  const empty = { tier_name: "", description: "", duration_label: "", price: "", icon: "" };
   const [draft, setDraft] = useState(empty);
   const [editingId, setEditingId] = useState(null);
   const [editDraft, setEditDraft] = useState(empty);
@@ -82,7 +82,7 @@ function TiersEditor({ tiers, onAdd, onUpdate, onDelete }) {
 
   return (
     <div className="card">
-      <h3 className="font-semibold text-gray-900 mb-3">Pricing Tiers</h3>
+      <h3 className="font-semibold text-gray-900 mb-3">Delivery Options</h3>
       <div className="space-y-2 mb-4">
         {tiers.map((t) => (
           <div key={t.id} className="border border-gray-100 rounded-lg p-3">
@@ -90,8 +90,10 @@ function TiersEditor({ tiers, onAdd, onUpdate, onDelete }) {
               <div className="grid grid-cols-2 gap-2">
                 <input className="input" placeholder="Icon" value={editDraft.icon}
                   onChange={(e) => setEditDraft({ ...editDraft, icon: e.target.value })} />
-                <input className="input" placeholder="Tier name" value={editDraft.tier_name}
+                <input className="input" placeholder="Option name" value={editDraft.tier_name}
                   onChange={(e) => setEditDraft({ ...editDraft, tier_name: e.target.value })} />
+                <input className="input" placeholder="Short description" value={editDraft.description}
+                  onChange={(e) => setEditDraft({ ...editDraft, description: e.target.value })} />
                 <input className="input" placeholder="Duration label" value={editDraft.duration_label}
                   onChange={(e) => setEditDraft({ ...editDraft, duration_label: e.target.value })} />
                 <input className="input" type="number" placeholder="Price" value={editDraft.price}
@@ -110,12 +112,13 @@ function TiersEditor({ tiers, onAdd, onUpdate, onDelete }) {
                   <span className="text-lg">{t.icon || "📦"}</span>
                   <div>
                     <p className="font-semibold text-sm text-gray-900">{t.tier_name}</p>
+                    {t.description && <p className="text-xs text-gray-500">{t.description}</p>}
                     <p className="text-xs text-gray-400">{t.duration_label}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
                   <span className="font-bold text-gray-900">${Number(t.price).toFixed(2)}</span>
-                  <button type="button" onClick={() => { setEditingId(t.id); setEditDraft({ tier_name: t.tier_name, duration_label: t.duration_label || "", price: t.price, icon: t.icon || "" }); }}
+                  <button type="button" onClick={() => { setEditingId(t.id); setEditDraft({ tier_name: t.tier_name, description: t.description || "", duration_label: t.duration_label || "", price: t.price, icon: t.icon || "" }); }}
                     className="text-gray-400 hover:text-gray-700"><FiEdit2 size={14} /></button>
                   <button type="button" onClick={() => onDelete(t.id)}
                     className="text-gray-400 hover:text-red-600"><FiTrash2 size={14} /></button>
@@ -124,14 +127,16 @@ function TiersEditor({ tiers, onAdd, onUpdate, onDelete }) {
             )}
           </div>
         ))}
-        {tiers.length === 0 && <p className="text-sm text-gray-400">No pricing tiers yet — a service needs at least one to be bookable.</p>}
+        {tiers.length === 0 && <p className="text-sm text-gray-400">No delivery options yet — add at least one option to make this service bookable.</p>}
       </div>
-      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Add a tier</p>
+      <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Add a delivery option</p>
       <div className="grid grid-cols-2 gap-2">
         <input className="input" placeholder="Icon (emoji, optional)" value={draft.icon}
           onChange={(e) => setDraft({ ...draft, icon: e.target.value })} />
-        <input className="input" placeholder="Tier name *" value={draft.tier_name}
+        <input className="input" placeholder="Option name *" value={draft.tier_name}
           onChange={(e) => setDraft({ ...draft, tier_name: e.target.value })} />
+        <input className="input" placeholder="Short description" value={draft.description}
+          onChange={(e) => setDraft({ ...draft, description: e.target.value })} />
         <input className="input" placeholder="Duration label (e.g. 3-5 Business Days)" value={draft.duration_label}
           onChange={(e) => setDraft({ ...draft, duration_label: e.target.value })} />
         <input className="input" type="number" placeholder="Price *" value={draft.price}
@@ -139,7 +144,7 @@ function TiersEditor({ tiers, onAdd, onUpdate, onDelete }) {
       </div>
       <button type="button" onClick={submitAdd}
         className="mt-2 px-4 py-2 rounded-lg bg-brand-500 text-white text-sm font-semibold hover:bg-brand-600">
-        + Add Tier
+        + Add Delivery Option
       </button>
     </div>
   );

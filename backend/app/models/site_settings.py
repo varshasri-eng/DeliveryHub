@@ -12,8 +12,8 @@ class SiteSettings(db.Model):
     id = db.Column(db.Integer, primary_key=True, default=1)
 
     # ── Identity ──────────────────────────────────────────
-    site_name    = db.Column(db.String(100), default="Store2Home")
-    tagline      = db.Column(db.String(255), default="Fresh groceries, delivered to your door")
+    site_name    = db.Column(db.String(100), default="DeliveryHub")
+    tagline      = db.Column(db.String(255), default="International shipping between the U.S. and India")
     logo_url     = db.Column(db.Text, default=None)   # uploaded logo URL
     favicon_url  = db.Column(db.Text, default=None)   # favicon URL
 
@@ -28,9 +28,9 @@ class SiteSettings(db.Model):
     accent_color    = db.Column(db.String(7), default="#7DD8A6")  # soft mint highlight
 
     # ── Hero / Landing ────────────────────────────────────
-    hero_title    = db.Column(db.String(255), default="Fresh groceries, delivered to your door")
-    hero_subtitle = db.Column(db.String(500), default="Shop your favourite Indian groceries in your own language.")
-    hero_cta      = db.Column(db.String(100), default="Start shopping")
+    hero_title    = db.Column(db.String(255), default="Send your shipment with confidence.")
+    hero_subtitle = db.Column(db.String(500), default="Choose a shipping service and delivery option for shipments between the U.S. and India.")
+    hero_cta      = db.Column(db.String(100), default="Explore shipping services")
     # Banner image shown above the shop page search/category area.
     # Same "admin provides a URL" pattern as logo_url/favicon_url,
     # not a file-upload field — consistent with how the rest of
@@ -43,7 +43,7 @@ class SiteSettings(db.Model):
     address       = db.Column(db.Text, default=None)
 
     # ── Footer ────────────────────────────────────────────
-    footer_text   = db.Column(db.String(500), default="© Store2Home. Fresh groceries, delivered.")
+    footer_text   = db.Column(db.String(500), default="© DeliveryHub. International shipping made straightforward.")
 
     # ── Social ────────────────────────────────────────────
     facebook_url  = db.Column(db.Text, default=None)

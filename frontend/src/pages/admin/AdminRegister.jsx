@@ -45,7 +45,7 @@ export default function AdminRegister() {
           <div className="w-10 h-10 bg-brand-500 rounded-xl flex items-center justify-center">
             <FiShield className="text-white text-lg" />
           </div>
-          <span className="text-white font-bold text-xl">TajaMeat</span>
+          <span className="text-white font-bold text-xl">DeliveryHub</span>
         </div>
 
         <div>
@@ -88,7 +88,7 @@ export default function AdminRegister() {
             <div className="w-9 h-9 bg-brand-500 rounded-xl flex items-center justify-center">
               <FiShield className="text-white" />
             </div>
-            <span className="text-white font-bold text-lg">TajaMeat Staff</span>
+            <span className="text-white font-bold text-lg">DeliveryHub Staff</span>
           </div>
 
           {submitted ? (
@@ -248,7 +248,7 @@ export default function AdminRegister() {
                                px-4 py-2.5 text-white text-sm placeholder-gray-500
                                focus:outline-none focus:ring-2 focus:ring-brand-500
                                focus:border-transparent resize-none"
-                    placeholder="e.g. I will be managing delivery orders for Lathrop"
+                    placeholder="e.g. I will be managing international shipment bookings"
                     value={form.note}
                     onChange={set("note")}
                   />

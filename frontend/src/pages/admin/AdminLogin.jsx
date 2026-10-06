@@ -52,7 +52,7 @@ export default function AdminLogin() {
           <div className="w-10 h-10 bg-brand-500 rounded-xl flex items-center justify-center">
             <FiShield className="text-white text-lg" />
           </div>
-          <span className="text-white font-bold text-xl">TajaMeat</span>
+          <span className="text-white font-bold text-xl">DeliveryHub</span>
         </div>
 
         <div>
@@ -60,8 +60,7 @@ export default function AdminLogin() {
             Staff Portal
           </h1>
           <p className="text-gray-400 text-lg leading-relaxed">
-            Manage customers, products, inventory and orders
-            for our Dublin, San Ramon, Pleasanton, Livermore, Lathrop &amp; Manteca delivery operations.
+            Manage shipping services, delivery options, customer bookings, and shipment status.
           </p>
         </div>
 
@@ -89,7 +88,7 @@ export default function AdminLogin() {
             <div className="w-9 h-9 bg-brand-500 rounded-xl flex items-center justify-center">
               <FiShield className="text-white" />
             </div>
-            <span className="text-white font-bold text-lg">TajaMeat Staff</span>
+            <span className="text-white font-bold text-lg">DeliveryHub Staff</span>
           </div>
 
           <h2 className="text-2xl font-bold text-white mb-1">Sign in</h2>
@@ -125,7 +124,7 @@ export default function AdminLogin() {
                              pl-9 pr-4 py-2.5 text-white text-sm placeholder-gray-500
                              focus:outline-none focus:ring-2 focus:ring-brand-500
                              focus:border-transparent"
-                  placeholder="staff@tajameat.com"
+                  placeholder="staff@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   autoFocus

@@ -167,7 +167,7 @@ export default function FamilyGroup() {
             <h3 className="text-gray-800 font-semibold mb-1">Not in a group yet</h3>
             <p className="text-gray-500 text-sm max-w-xs mx-auto">
               Create a family group or join one with an invite code to coordinate
-              grocery orders with your household.
+              account access with your household.
             </p>
           </div>
 
@@ -232,7 +232,7 @@ function Header() {
     <div className="mb-6">
       <h1 className="text-2xl font-bold text-gray-900">Family Group</h1>
       <p className="text-gray-500 text-sm mt-0.5">
-        Share a household with family members to coordinate grocery orders
+        Share account access with family members in your household
       </p>
     </div>
   );

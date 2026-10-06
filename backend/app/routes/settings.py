@@ -46,7 +46,7 @@ def update_settings(customer):
 
     # ── Identity ──────────────────────────────────────────
     if "site_name" in data:
-        s.site_name = data["site_name"] or "Store2Home"
+        s.site_name = data["site_name"] or "DeliveryHub"
     if "tagline" in data:
         s.tagline = data["tagline"]
     if "logo_url" in data:

@@ -76,7 +76,7 @@ export default function Register() {
             <FiHome className="text-white text-2xl" />
           </div>
           <h1 className="text-2xl font-bold text-gray-900">Create your account</h1>
-          <p className="text-gray-500 text-sm mt-1">TajaMeat — Dublin, San Ramon, Pleasanton, Livermore, Lathrop &amp; Manteca</p>
+          <p className="text-gray-500 text-sm mt-1">Create an account to book and manage your international shipments.</p>
         </div>
 
         <form onSubmit={handleRegister} className="card space-y-5">

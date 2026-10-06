@@ -18,7 +18,7 @@ def create_app():
     # import models so Flask-Migrate sees them
     with app.app_context():
         from app.models import (          # noqa: F401
-            Customer, Address, CustomerAddress,
+            Customer, Address, CustomerAddress, DeliveryZone,
             Household, HouseholdMember,
             Session, OTPVerification,
             SiteSettings, PaymentSettings, StaticPage,
@@ -66,6 +66,6 @@ def create_app():
     # health check
     @app.route("/api/health")
     def health():
-        return {"status": "ok", "service": "store2home-backend"}
+        return {"status": "ok", "service": "deliveryhub-backend"}
 
     return app

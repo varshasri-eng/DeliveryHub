@@ -42,7 +42,7 @@ export default function ResetPassword() {
                           bg-brand-500 rounded-2xl mb-4 shadow-lg">
             <FiHome className="text-white text-2xl" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">TajaMeat</h1>
+          <h1 className="text-2xl font-bold text-gray-900">DeliveryHub</h1>
         </div>
 
         <div className="card">
@@ -64,7 +64,7 @@ export default function ResetPassword() {
             <>
               <h2 className="text-lg font-semibold text-gray-800 mb-2">Set a new password</h2>
               <p className="text-sm text-gray-500 mb-6">
-                Choose a new password for your TajaMeat account.
+                Choose a new password for your DeliveryHub account.
               </p>
               <form onSubmit={handleSubmit} className="space-y-4">
                 <div>

@@ -19,8 +19,8 @@ const PERMISSION_COLORS = {
 };
 
 const PERMISSION_DESC = {
-  read:  "View customers, orders and products. No edits.",
-  write: "Read + update orders, edit products and inventory.",
+  read:  "View customers, services, and shipments. No edits.",
+  write: "Read + update shipments and manage service details.",
   full:  "Full access including staff approval and role management.",
 };
 

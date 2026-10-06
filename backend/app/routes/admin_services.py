@@ -44,6 +44,13 @@ def _slugify(value):
     return re.sub(r"[^a-z0-9]+", "-", value.lower()).strip("-")
 
 
+DEFAULT_PRICING_TIERS = (
+    ("Express", "Fastest delivery", "3-5 business days", 75, "⚡"),
+    ("Economy", "Lower cost when time is flexible", "10-15 business days", 55, "💰"),
+    ("Group", "Best value for flexible delivery", "15-25 business days", 45, "👥"),
+)
+
+
 # ── SERVICE TYPES ────────────────────────────────────────────
 @admin_services_bp.route("", methods=["GET"])
 @permission_required("read")
@@ -76,6 +83,15 @@ def create_service(customer):
         display_order=int(data.get("display_order") or 0),
     )
     db.session.add(service)
+    for display_order, (tier_name, description, duration_label, price, icon) in enumerate(DEFAULT_PRICING_TIERS):
+        service.pricing_tiers.append(ServicePricingTier(
+            tier_name=tier_name,
+            description=description,
+            duration_label=duration_label,
+            price=price,
+            icon=icon,
+            display_order=display_order,
+        ))
     db.session.commit()
     return jsonify({"message": "Service created.", "service": service.to_dict(include_details=True)}), 201
 
@@ -248,6 +264,7 @@ def add_pricing_tier(customer, service_id):
     tier = ServicePricingTier(
         service_type_id=service.id,
         tier_name=tier_name,
+        description=(data.get("description") or "").strip() or None,
         duration_label=(data.get("duration_label") or "").strip() or None,
         price=price,
         icon=(data.get("icon") or "").strip() or None,
@@ -267,6 +284,8 @@ def update_pricing_tier(customer, tier_id):
     data = request.get_json(silent=True) or {}
     if "tier_name" in data:
         tier.tier_name = data["tier_name"].strip()
+    if "description" in data:
+        tier.description = (data["description"] or "").strip() or None
     if "duration_label" in data:
         tier.duration_label = (data["duration_label"] or "").strip() or None
     if "price" in data:

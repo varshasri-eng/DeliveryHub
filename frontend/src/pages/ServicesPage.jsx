@@ -17,7 +17,7 @@ export default function ServicesPage() {
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10">
       <h1 className="text-3xl font-extrabold text-gray-900">Book a Shipment</h1>
-      <p className="text-gray-500 mt-2 mb-8">Choose a service to get started.</p>
+      <p className="text-gray-500 mt-2 mb-8">Choose a service to view its details and delivery options.</p>
 
       {loading ? (
         <div className="grid sm:grid-cols-2 gap-4">

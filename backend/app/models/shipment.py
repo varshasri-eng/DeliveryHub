@@ -15,6 +15,7 @@ class Shipment(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     shipment_number = db.Column(db.String(30), unique=True)
     customer_id = db.Column(db.Integer, db.ForeignKey("customers.id"), nullable=True)
+    route_direction = db.Column(db.String(10), nullable=True)
     service_type_id = db.Column(db.Integer, db.ForeignKey("service_types.id"), nullable=False)
     pricing_tier_id = db.Column(db.Integer, db.ForeignKey("service_pricing_tiers.id"), nullable=False)
 
@@ -47,6 +48,7 @@ class Shipment(db.Model):
             "id": self.id,
             "shipment_number": self.shipment_number,
             "customer_id": self.customer_id,
+            "route_direction": self.route_direction,
             "service_type_id": self.service_type_id,
             "service_name": self.service_type.name if self.service_type else None,
             "pricing_tier_id": self.pricing_tier_id,

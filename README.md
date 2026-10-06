@@ -1,64 +1,80 @@
-# Store2Home
+# DeliveryHub
 
-A full-stack grocery delivery platform for Lathrop and Mountain House, CA.
+DeliveryHub is a shipment-booking application for services between the
+United States and India. Customers choose a shipping direction, enter sender
+and recipient details, select a delivery option, and submit a shipment
+request. Admins manage shipping services, delivery options, custom booking
+fields, shipment status, and invoices.
 
-## Tech Stack
+## Stack
 
-- **Frontend:** React (Vite), Tailwind CSS
-- **Backend:** Python Flask, SQLAlchemy
-- **Database:** PostgreSQL
-- **Infra:** Docker Compose
+- **Frontend:** React, Vite, Tailwind CSS
+- **Backend:** Python 3.12, Flask, SQLAlchemy
+- **Database:** PostgreSQL in the Docker deployment; SQLite can be used for
+  isolated local development
+- **Deployment:** Docker Compose on the SSH server
 
-## Quick Start
+## Local development
 
-```bash
-# Clone the branch
-git clone -b store2home https://github.com/varshasri-eng/multilingual-product-search.git
-cd multilingual-product-search
+Run the Flask API and Vite frontend separately. Docker is not required for
+local development.
 
-# Create .env file
-cp .env.example .env
-# Edit .env — set your own passwords and secrets
+In one PowerShell window:
 
-# Start everything
-docker compose up -d
+```powershell
+cd backend
+$env:DATABASE_URL = "sqlite:///deliveryhub-local.db"
+$env:FLASK_SECRET_KEY = "local-development-only"
+python wsgi.py
 ```
 
-Once running:
+In another PowerShell window:
 
-| Service | URL | Purpose |
-|---|---|---|
-| Customer portal | http://localhost:3000 | Register, login, dashboard |
-| Admin portal | http://localhost:3000/admin/login | Customer & staff management |
-| API | http://localhost:5001 | Flask backend |
-| pgAdmin | http://localhost:5051 | Database GUI |
-
-## Project Structure
-
-```
-├── backend/              # Flask API
-│   ├── app/
-│   │   ├── models/       # SQLAlchemy models
-│   │   ├── routes/       # API endpoints
-│   │   └── utils/        # Auth, OTP helpers
-│   └── wsgi.py
-├── frontend/             # React app
-│   └── src/
-│       ├── api/          # API client
-│       ├── components/   # Layouts
-│       ├── context/      # Auth context
-│       └── pages/        # account/, admin/, Login, Register
-├── db/
-│   └── schema.sql
-├── docker-compose.yml
-└── .env.example
+```powershell
+cd frontend
+npm ci
+$env:VITE_API_PROXY_TARGET = "http://127.0.0.1:5000"
+npm run dev
 ```
 
-## Features
+The frontend is available at `http://localhost:3000`; the API health endpoint
+is `http://localhost:5000/api/health`. The Vite proxy defaults to the Compose
+backend hostname, so set `VITE_API_PROXY_TARGET` when running Flask locally.
 
-- Customer registration with OTP via email
-- Customer dashboard: Profile, Addresses, Orders, Family Group, Notifications, Settings
-- Admin portal: customer search & filter (name, phone, email, address, diet group, family group, order)
-- Staff management with role-based access (read, write, full)
-- Delivery zone enforcement (95330, 95391)
-- Family/household groups for shared ordering
+## Docker deployment
+
+Docker Compose is intended for deployment on the SSH server after the local
+flow and database changes have been verified. The compose file reads database,
+Flask, frontend, and SMTP settings from the environment. Configure those
+values on the server, apply the applicable database migrations, and then run:
+
+```sh
+docker compose up -d --build
+```
+
+Do not use the current legacy `db/schema.sql` as a DeliveryHub schema: it still
+contains the previous order-based invoice design. The SQL migration scripts in `db/migrations/` add the current shipment and
+delivery-option fields and update legacy default branding; they do not convert
+the old order-based invoice schema.
+
+## Project structure
+
+```text
+backend/
+  app/models/       SQLAlchemy models
+  app/routes/       Flask API routes
+  app/utils/        Authentication and bootstrap helpers
+  wsgi.py           Local Flask entry point
+frontend/
+  src/api/          API client wrappers
+  src/pages/        Public, customer, and admin screens
+db/
+  migrations/       Incremental SQL changes for existing databases
+  schema.sql        Legacy Store2Home schema; not the DeliveryHub schema
+```
+
+New services created in the admin portal start with Express, Economy, and
+Group delivery options. Admins can change their names, descriptions, delivery
+estimates, icons, and fixed prices. Booking supports both United States → India
+and India → United States; country, phone code, and ZIP/PIN validation adapt to
+the selected direction.

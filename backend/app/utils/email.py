@@ -24,15 +24,15 @@ def send_reset_email(customer, token: str) -> bool:
     """Deliver a password-reset link. Returns True if delivered via SMTP,
     False if logged to console (dev mode)."""
     url = build_reset_url(token)
-    subject = "Reset your Store2Home password"
+    subject = "Reset your DeliveryHub password"
     body = (
         f"Hi {customer.name or 'there'},\n\n"
-        f"We received a request to reset your Store2Home password.\n\n"
+        f"We received a request to reset your DeliveryHub password.\n\n"
         f"Click the link below to choose a new password. It expires in "
         f"{current_app.config.get('RESET_TOKEN_EXPIRY_MINUTES', 60)} minutes:\n\n"
         f"{url}\n\n"
         f"If you didn't request this, you can safely ignore this email.\n\n"
-        f"— Store2Home"
+        f"— DeliveryHub"
     )
 
     host = os.getenv("SMTP_HOST")
@@ -41,7 +41,7 @@ def send_reset_email(customer, token: str) -> bool:
             port = int(os.getenv("SMTP_PORT", "587"))
             username = os.getenv("SMTP_USERNAME")
             password = os.getenv("SMTP_PASSWORD")
-            from_addr = os.getenv("SMTP_FROM", username or "noreply@store2home.com")
+            from_addr = os.getenv("SMTP_FROM", username or "noreply@example.com")
 
             msg = MIMEMultipart()
             msg["From"] = from_addr

@@ -70,30 +70,30 @@ export const deleteService = (id) =>
 export const addCoverageItem = (serviceId, data) =>
   api.post(`/admin/services/${serviceId}/coverage`, data);
 export const updateCoverageItem = (itemId, data) =>
-  api.put(`/admin/coverage/${itemId}`, data);
+  api.put(`/admin/services/coverage/${itemId}`, data);
 export const deleteCoverageItem = (itemId) =>
-  api.delete(`/admin/coverage/${itemId}`);
+  api.delete(`/admin/services/coverage/${itemId}`);
 
 export const addRestriction = (serviceId, data) =>
   api.post(`/admin/services/${serviceId}/restrictions`, data);
 export const updateRestriction = (itemId, data) =>
-  api.put(`/admin/restrictions/${itemId}`, data);
+  api.put(`/admin/services/restrictions/${itemId}`, data);
 export const deleteRestriction = (itemId) =>
-  api.delete(`/admin/restrictions/${itemId}`);
+  api.delete(`/admin/services/restrictions/${itemId}`);
 
 export const addPricingTier = (serviceId, data) =>
   api.post(`/admin/services/${serviceId}/pricing-tiers`, data);
 export const updatePricingTier = (tierId, data) =>
-  api.put(`/admin/pricing-tiers/${tierId}`, data);
+  api.put(`/admin/services/pricing-tiers/${tierId}`, data);
 export const deletePricingTier = (tierId) =>
-  api.delete(`/admin/pricing-tiers/${tierId}`);
+  api.delete(`/admin/services/pricing-tiers/${tierId}`);
 
 export const addField = (serviceId, data) =>
   api.post(`/admin/services/${serviceId}/fields`, data);
 export const updateField = (fieldId, data) =>
-  api.put(`/admin/fields/${fieldId}`, data);
+  api.put(`/admin/services/fields/${fieldId}`, data);
 export const deleteField = (fieldId) =>
-  api.delete(`/admin/fields/${fieldId}`);
+  api.delete(`/admin/services/fields/${fieldId}`);
 
 // ── Payment settings ───────────────────────────────────────────
 // The QR code + instructions shown on every invoice. Separate from

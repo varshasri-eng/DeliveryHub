@@ -31,4 +31,9 @@ class Session(db.Model):
     expires_at = db.Column(db.DateTime(timezone=True), nullable=False)
 
     def is_valid(self):
-        return self.is_active and self.expires_at > datetime.now(timezone.utc)
+        if not self.is_active:
+            return False
+        expires_at = self.expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=timezone.utc)
+        return expires_at > datetime.now(timezone.utc)

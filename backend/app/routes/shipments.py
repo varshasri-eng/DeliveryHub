@@ -18,6 +18,7 @@ that service (service_fields), not about availability.
 """
 
 import os
+import re
 import secrets
 from datetime import datetime, timezone
 
@@ -33,6 +34,30 @@ shipments_bp = Blueprint("shipments", __name__)
 PAYMENT_SCREENSHOT_SUBDIR = os.path.join("static", "uploads", "payment_screenshots")
 PAYMENT_SCREENSHOT_EXTENSIONS = {"png", "jpg", "jpeg", "webp", "pdf"}
 PAYMENT_SCREENSHOT_MAX_BYTES = 5 * 1024 * 1024  # 5 MB
+VALID_ROUTE_DIRECTIONS = {"US_TO_IN", "IN_TO_US"}
+ROUTE_COUNTRIES = {
+    "US_TO_IN": ("United States", "India"),
+    "IN_TO_US": ("India", "United States"),
+}
+
+
+def _validate_route_details(data, direction):
+    sender_country, receiver_country = ROUTE_COUNTRIES[direction]
+    for role, expected_country in (
+        ("sender", sender_country),
+        ("receiver", receiver_country),
+    ):
+        country = (data.get(f"{role}_country") or "").strip()
+        if country != expected_country:
+            return jsonify({"error": f"{role.title()} country must be {expected_country} for this direction."}), 400
+
+        postal_code = (data.get(f"{role}_postal_code") or "").strip()
+        if expected_country == "India":
+            if not re.fullmatch(r"\d{6}", postal_code):
+                return jsonify({"error": f"Enter a valid 6-digit {role} PIN code."}), 400
+        elif not re.fullmatch(r"\d{5}(?:-\d{4})?", postal_code):
+            return jsonify({"error": f"Enter a valid {role} ZIP code (5 digits or ZIP+4)."}), 400
+    return None
 
 
 def _validate_booking(data):
@@ -97,6 +122,9 @@ def _validate_booking(data):
     field_values = {}
     for field in service.fields:
         value = submitted_values.get(field.field_key)
+
+        if field.field_type == "file":
+            continue
 
         if field.field_type == "checkbox":
             # Checkboxes are the one type where "unchecked" is a real,
@@ -166,6 +194,12 @@ def get_shipment(customer, shipment_id):
 @login_required
 def create_shipment(customer):
     data = request.get_json(silent=True) or {}
+    route_direction = data.get("route_direction")
+    if route_direction not in VALID_ROUTE_DIRECTIONS:
+        return jsonify({"error": "Choose a valid shipment direction."}), 400
+    route_error = _validate_route_details(data, route_direction)
+    if route_error:
+        return route_error
 
     service, tier, quantity, field_values, sender, receiver, err = _validate_booking(data)
     if err:
@@ -176,6 +210,7 @@ def create_shipment(customer):
     shipment = Shipment(
         shipment_number=generate_shipment_number(),
         customer_id=customer.id,
+        route_direction=route_direction,
         service_type_id=service.id,
         pricing_tier_id=tier.id,
         quantity=quantity,
@@ -204,6 +239,12 @@ def create_shipment(customer):
 @shipments_bp.route("/guest", methods=["POST"])
 def create_guest_shipment():
     data = request.get_json(silent=True) or {}
+    route_direction = data.get("route_direction")
+    if route_direction not in VALID_ROUTE_DIRECTIONS:
+        return jsonify({"error": "Choose a valid shipment direction."}), 400
+    route_error = _validate_route_details(data, route_direction)
+    if route_error:
+        return route_error
 
     guest_name = (data.get("guest_name") or "").strip()
     guest_email = (data.get("guest_email") or "").strip()
@@ -239,6 +280,7 @@ def create_guest_shipment():
     shipment = Shipment(
         shipment_number=generate_shipment_number(),
         customer_id=customer.id,
+        route_direction=route_direction,
         service_type_id=service.id,
         pricing_tier_id=tier.id,
         quantity=quantity,

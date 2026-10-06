@@ -83,6 +83,7 @@ class ServicePricingTier(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     service_type_id = db.Column(db.Integer, db.ForeignKey("service_types.id", ondelete="CASCADE"), nullable=False)
     tier_name = db.Column(db.String(255), nullable=False)
+    description = db.Column(db.String(255))
     duration_label = db.Column(db.String(100))
     price = db.Column(db.Numeric(10, 2), nullable=False)
     icon = db.Column(db.String(20))
@@ -92,6 +93,7 @@ class ServicePricingTier(db.Model):
         return {
             "id": self.id,
             "tier_name": self.tier_name,
+            "description": self.description,
             "duration_label": self.duration_label,
             "price": float(self.price),
             "icon": self.icon,

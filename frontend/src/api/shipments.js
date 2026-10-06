@@ -13,6 +13,9 @@ export const createShipment = (data) =>
 export const createGuestShipment = (data) =>
   api.post("/shipments/guest", data);
 
+export const trackShipment = (shipmentNumber) =>
+  api.get(`/shipments/track/${encodeURIComponent(shipmentNumber)}`);
+
 // ── Payment proof ─────────────────────────────────────────────
 // Submits a screenshot and/or a note for a shipment's invoice. At
 // least one of the two is required — pass whichever the customer

@@ -130,6 +130,9 @@ export default function ServiceDetailPage() {
                     <span className="text-2xl">{t.icon || "📦"}</span>
                     <div>
                       <p className="font-semibold text-gray-900">{t.tier_name}</p>
+                      {t.description && (
+                        <p className="text-xs text-gray-500 mt-0.5">{t.description}</p>
+                      )}
                       {t.duration_label && (
                         <p className="text-xs text-gray-500 mt-0.5">{t.duration_label}</p>
                       )}

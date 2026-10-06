@@ -40,9 +40,9 @@ export default function Login() {
                           bg-brand-500 rounded-2xl mb-4 shadow-lg">
             <FiHome className="text-white text-2xl" />
           </div>
-          <h1 className="text-2xl font-bold text-gray-900">TajaMeat</h1>
+          <h1 className="text-2xl font-bold text-gray-900">DeliveryHub</h1>
           <p className="text-gray-500 text-sm mt-1">
-            Local delivery for Dublin, San Ramon, Pleasanton, Livermore, Lathrop &amp; Manteca
+            Shipment bookings between the United States and India
           </p>
         </div>
 

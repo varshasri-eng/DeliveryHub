@@ -6,7 +6,7 @@ import toast from "react-hot-toast";
 import {
   FiUser, FiMapPin, FiLogOut, FiHome,
   FiShoppingBag, FiUsers, FiBell, FiSettings,
-  FiChevronRight, FiChevronLeft, FiShoppingCart,
+  FiChevronRight, FiChevronLeft, FiTruck,
 } from "react-icons/fi";
 import { useState } from "react";
 import BrandLogo from "./BrandLogo";
@@ -165,18 +165,18 @@ export default function CustomerLayout() {
       {/* ── Main column: slim top bar + content + footer ─── */}
       <div className="flex-1 flex flex-col min-h-screen">
         {/* Slim top bar — sidebar already handles account navigation,
-            so this stays minimal: quick way back to the shop, and a
-            notifications shortcut, rather than duplicating the
+            so this stays minimal: quick way back to shipping services,
+            and a notifications shortcut, rather than duplicating the
             sidebar's own links. */}
         <header className="sticky top-0 z-30 bg-white/80 backdrop-blur-md border-b border-gray-100">
           <div className="flex items-center justify-end gap-2 px-8 h-14">
             <Link
-              to="/shop"
+              to="/services"
               className="flex items-center gap-1.5 text-sm font-medium text-gray-500
                          hover:text-gray-900 transition-colors px-3 py-1.5 rounded-lg
                          hover:bg-gray-50">
-              <FiShoppingCart size={14} />
-              Shop
+              <FiTruck size={14} />
+              Book a shipment
             </Link>
             <Link
               to="/account/notifications"

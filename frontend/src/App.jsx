@@ -40,6 +40,7 @@ import BookShipmentPage from "./pages/BookShipmentPage";
 import AdminPages from "./pages/admin/AdminPages";
 import AdminShipments from "./pages/admin/AdminShipments";
 import AdminServices from "./pages/admin/AdminServices";
+import TrackShipmentPage from "./pages/TrackShipmentPage";
 
 const Loader = () => (
   <div className="flex items-center justify-center h-screen text-gray-400">
@@ -81,6 +82,7 @@ export default function App() {
           <Route path="/services" element={<ServicesPage />} />
           <Route path="/services/:slug" element={<ServiceDetailPage />} />
           <Route path="/services/:slug/book" element={<BookShipmentPage />} />
+          <Route path="/track" element={<TrackShipmentPage />} />
         </Route>
 
         {/* ── Customer auth ──────────────────────────── */}

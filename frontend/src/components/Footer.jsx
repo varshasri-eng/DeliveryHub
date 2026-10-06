@@ -22,7 +22,7 @@ export default function Footer() {
           <div className="max-w-6xl mx-auto px-4 sm:px-6 py-4 flex flex-wrap items-center justify-between gap-3">
             <p className="flex items-center gap-2 text-sm font-medium text-brand-800">
               <FaWhatsapp size={18} className="text-green-600 flex-shrink-0" />
-              Join our WhatsApp community for updates, offers, and order help.
+              Join our WhatsApp community for shipment updates and support.
             </p>
             <a
               href={settings.whatsapp_community_url}
@@ -82,8 +82,8 @@ export default function Footer() {
             Links
           </p>
           <div className="space-y-2 text-sm">
-            <Link to="/shop" className="block text-gray-600 hover:text-brand-600 transition-colors">
-              Shop
+            <Link to="/services" className="block text-gray-600 hover:text-brand-600 transition-colors">
+              Shipping services
             </Link>
             <Link to="/login" className="block text-gray-600 hover:text-brand-600 transition-colors">
               Sign in

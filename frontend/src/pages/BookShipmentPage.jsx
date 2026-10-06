@@ -9,16 +9,25 @@ import { useAuth } from "../context/AuthContext";
 const money = (n) => `$${Number(n).toFixed(2).replace(/\.00$/, "")}`;
 const WHATSAPP_NUMBER = "15107146946";
 
-const COUNTRIES = ["Canada", "United States", "India", "United Kingdom", "Australia"];
-const CODES = ["1", "91", "44", "61"];
+const DIRECTIONS = {
+  US_TO_IN: {
+    label: "United States → India",
+    from: { name: "United States", shortName: "USA", phoneCode: "1", postalLabel: "ZIP Code", postalPlaceholder: "94105", postalPattern: /^\d{5}(?:-\d{4})?$/ },
+    to: { name: "India", shortName: "India", phoneCode: "91", postalLabel: "Postal Code", postalPlaceholder: "500072", postalPattern: /^\d{6}$/ },
+  },
+  IN_TO_US: {
+    label: "India → United States",
+    from: { name: "India", shortName: "India", phoneCode: "91", postalLabel: "Postal Code", postalPlaceholder: "500072", postalPattern: /^\d{6}$/ },
+    to: { name: "United States", shortName: "USA", phoneCode: "1", postalLabel: "ZIP Code", postalPlaceholder: "94105", postalPattern: /^\d{5}(?:-\d{4})?$/ },
+  },
+};
 
 const emptyParty = () => ({
-  name: "", countryCode: "1", phone: "",
-  country: "Canada", postalCode: "", street: "", city: "", province: "",
+  name: "", phone: "", postalCode: "", street: "", city: "", province: "",
 });
 
-function formatAddress(p) {
-  return [p.street, p.city, [p.province, p.postalCode].filter(Boolean).join(" "), p.country]
+function formatAddress(p, country) {
+  return [p.street, p.city, [p.province, p.postalCode].filter(Boolean).join(" "), country.name]
     .filter(Boolean).join(", ");
 }
 
@@ -28,11 +37,17 @@ function splitOption(o) {
   const sub = rest.join(" — "); return { title, sub: sub.charAt(0).toUpperCase() + sub.slice(1) };
 }
 
-function validateParty(p, who) {
+function validateParty(p, who, country) {
   const e = {};
   if (!p.name.trim()) e.name = `Enter the ${who}'s name.`;
-  if (p.phone.replace(/\D/g, "").length < 6) e.phone = "Enter a valid phone number.";
-  if (!p.postalCode.trim()) e.postalCode = "Postal code is required.";
+  if (p.phone.replace(/\D/g, "").length !== 10) e.phone = "Enter a valid 10-digit phone number.";
+  if (!p.postalCode.trim()) {
+    e.postalCode = `${country.postalLabel} is required.`;
+  } else if (!country.postalPattern.test(p.postalCode.trim())) {
+    e.postalCode = country.name === "India"
+      ? "Enter a valid 6-digit postal code."
+      : "Enter a valid ZIP code (5 digits or ZIP+4).";
+  }
   if (!p.street.trim()) e.street = who === "sender" ? "Enter the pickup address." : "Enter the delivery address.";
   if (!p.city.trim()) e.city = "Enter the city.";
   if (!p.province.trim()) e.province = "Enter the province or state.";
@@ -41,10 +56,10 @@ function validateParty(p, who) {
 
 function Err({ show, msg }) {
   if (!show || !msg) return null;
-  return <p className="text-xs font-medium text-red-400 mt-1">{msg}</p>;
+  return <p className="text-xs font-medium text-red-600 mt-1">{msg}</p>;
 }
 
-function PartyCard({ letter, title, subtitle, who, value, onChange, errors, showErrors }) {
+function PartyCard({ letter, title, subtitle, who, value, onChange, errors, showErrors, country }) {
   const [touched, setTouched] = useState({});
   const set = (k) => (e) => onChange({ ...value, [k]: e.target.value });
   const blur = (k) => () => setTouched((t) => ({ ...t, [k]: true }));
@@ -62,6 +77,9 @@ function PartyCard({ letter, title, subtitle, who, value, onChange, errors, show
           <p className="font-semibold text-gray-900 text-sm leading-tight">{title}</p>
           <p className="text-xs text-gray-400 leading-tight">{subtitle}</p>
         </div>
+        <span className="ml-auto rounded-full bg-gray-100 px-2.5 py-1 text-xs font-semibold text-gray-600">
+          {country.shortName}
+        </span>
       </div>
 
       <div className="space-y-3">
@@ -72,31 +90,25 @@ function PartyCard({ letter, title, subtitle, who, value, onChange, errors, show
           <Err show={show("name")} msg={errors.name} />
         </div>
 
-        <div className="grid grid-cols-[90px_1fr] gap-2">
-          <div>
-            <label className="label">Code</label>
-            <select className="input" value={value.countryCode} onChange={set("countryCode")}>
-              {CODES.map((c) => <option key={c} value={c}>+{c}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="label">Phone *</label>
-            <input className={cls("phone")} placeholder="Phone number" inputMode="tel"
+        <div>
+          <label className="label">Phone *</label>
+          <div className="grid grid-cols-[72px_1fr] gap-2">
+            <span className="input flex items-center justify-center text-gray-500">+{country.phoneCode}</span>
+            <input className={cls("phone")} placeholder="10-digit phone number" inputMode="tel"
               value={value.phone} onChange={set("phone")} onBlur={blur("phone")} />
-            <Err show={show("phone")} msg={errors.phone} />
           </div>
+          <Err show={show("phone")} msg={errors.phone} />
         </div>
 
         <div className="grid grid-cols-2 gap-2">
           <div>
             <label className="label">Country</label>
-            <select className="input" value={value.country} onChange={set("country")}>
-              {COUNTRIES.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
+            <div className="input bg-gray-50 text-gray-600">{country.name}</div>
           </div>
           <div>
-            <label className="label">Postal code *</label>
-            <input className={cls("postalCode")} placeholder="A1A 1A1"
+            <label className="label">{country.postalLabel} *</label>
+            <input className={cls("postalCode")} placeholder={country.postalPlaceholder}
+              inputMode={country.name === "India" ? "numeric" : "text"}
               value={value.postalCode} onChange={set("postalCode")} onBlur={blur("postalCode")} />
             <Err show={show("postalCode")} msg={errors.postalCode} />
           </div>
@@ -166,6 +178,7 @@ function DynamicField({ field, value, onChange, error, showError }) {
             );
           })}
         </div>
+        <Err show={showError} msg={error} />
       </div>
     );
   }
@@ -174,10 +187,11 @@ function DynamicField({ field, value, onChange, error, showError }) {
     <div>
       <label htmlFor={id} className="label">{field.label} *</label>
       {field.field_type === "textarea" ? (
-        <textarea id={id} className="input" rows={3} value={value ?? ""}
+        <textarea id={id} className={`input ${showError && error ? "border-red-400" : ""}`} rows={3} value={value ?? ""}
           onChange={(e) => onChange(e.target.value)} />
       ) : field.field_type === "select" ? (
-        <select id={id} className="input" value={value ?? ""} onChange={(e) => onChange(e.target.value)}>
+        <select id={id} className={`input ${showError && error ? "border-red-400" : ""}`}
+          value={value ?? ""} onChange={(e) => onChange(e.target.value)}>
           <option value="">Select…</option>
           {opts.map((o) => <option key={o} value={o}>{o}</option>)}
         </select>
@@ -205,6 +219,7 @@ export default function BookShipmentPage() {
 
   const [service, setService] = useState(null);
   const [notFound, setNotFound] = useState(false);
+  const [direction, setDirection] = useState("US_TO_IN");
   const [sender, setSender] = useState(emptyParty());
   const [receiver, setReceiver] = useState(emptyParty());
   const [guestEmail, setGuestEmail] = useState("");
@@ -213,14 +228,24 @@ export default function BookShipmentPage() {
   const [submitting, setSubmitting] = useState(false);
   const [booked, setBooked] = useState(null);
 
-  const tierId = Number(searchParams.get("tier"));
+  const requestedTierId = Number(searchParams.get("tier"));
+  const [selectedTierId, setSelectedTierId] = useState(null);
   const quantity = Math.max(1, parseInt(searchParams.get("qty"), 10) || 1);
+  const route = DIRECTIONS[direction];
 
   useEffect(() => {
     getService(slug)
       .then((res) => {
         const svc = res.data.service;
         setService(svc);
+        const tiers = svc.pricing_tiers || [];
+        setSelectedTierId((current) => (
+          tiers.some((t) => t.id === current)
+            ? current
+            : tiers.some((t) => t.id === requestedTierId)
+              ? requestedTierId
+              : tiers[0]?.id ?? null
+        ));
         const initial = {};
         (svc.fields || []).forEach((f) => {
           if (f.field_type === "checkbox") initial[f.field_key] = false;
@@ -232,11 +257,13 @@ export default function BookShipmentPage() {
         setFieldValues(initial);
       })
       .catch(() => setNotFound(true));
-  }, [slug]);
+  }, [slug, requestedTierId]);
 
   useEffect(() => {
     if (!customer) return;
-    const phone = customer.phone && !customer.phone.startsWith("guest-") ? customer.phone : "";
+    const phone = customer.phone && !customer.phone.startsWith("guest-")
+      ? customer.phone.replace(/\D/g, "").replace(/^(?:1|91)(?=\d{10}$)/, "")
+      : "";
     setSender((prev) => ({ ...prev, name: prev.name || customer.name || "", phone: prev.phone || phone }));
   }, [customer]);
 
@@ -253,12 +280,13 @@ export default function BookShipmentPage() {
     return <div className="max-w-2xl mx-auto px-4 py-16 text-gray-400">Loading…</div>;
   }
 
-  const tier = (service.pricing_tiers || []).find((t) => t.id === tierId);
+  const tiers = service.pricing_tiers || [];
+  const tier = tiers.find((t) => t.id === selectedTierId);
 
-  if (!tier) {
+  if (tiers.length === 0) {
     return (
       <div className="max-w-3xl mx-auto px-4 py-16 text-center">
-        <h1 className="text-xl font-bold text-gray-900 mb-2">Please choose a shipping tier first</h1>
+        <h1 className="text-xl font-bold text-gray-900 mb-2">This service is not ready for booking</h1>
         <Link to={`/services/${service.slug}`} className="text-brand-600 hover:underline">
           Back to {service.name}
         </Link>
@@ -267,24 +295,24 @@ export default function BookShipmentPage() {
   }
 
   const effectiveQty = service.enable_quantity ? quantity : 1;
-  const total = Number(tier.price) * effectiveQty;
-  const fields = (service.fields || []).filter((f) => f.field_type !== 'textarea');
+  const total = tier ? Number(tier.price) * effectiveQty : 0;
+  const fields = service.fields || [];
   const shortName = service.name.replace(/\s+services?$/i, "");
 
   const setField = (key, value) => setFieldValues((prev) => ({ ...prev, [key]: value }));
 
-  const senderErrors = validateParty(sender, "sender");
-  const receiverErrors = validateParty(receiver, "receiver");
+  const senderErrors = validateParty(sender, "sender", route.from);
+  const receiverErrors = validateParty(receiver, "receiver", route.to);
   const fieldErrors = {};
   fields.forEach((f) => {
     if (f.field_type === "checkbox" || f.field_type === "file") return;
     const v = fieldValues[f.field_key];
     if (v === undefined || v === null || String(v).trim() === "") {
-      fieldErrors[f.field_key] = f.field_type === "date" ? "Choose a pickup date." : `${f.label} is required.`;
+      fieldErrors[f.field_key] = `${f.label} is required.`;
     }
   });
   const emailError = !customer && !/^\S+@\S+\.\S+$/.test(guestEmail.trim()) ? "Enter a valid email." : "";
-  const hasErrors =
+  const hasErrors = !tier ||
     Object.keys(senderErrors).length || Object.keys(receiverErrors).length ||
     Object.keys(fieldErrors).length || emailError;
 
@@ -303,15 +331,20 @@ export default function BookShipmentPage() {
     setSubmitting(true);
 
     const payload = {
+      route_direction: direction,
       service_type_id: service.id,
-      pricing_tier_id: tier.id,
+      pricing_tier_id: tier?.id,
       quantity: effectiveQty,
       sender_name: sender.name.trim(),
-      sender_phone: `+${sender.countryCode} ${sender.phone}`.trim(),
-      sender_address: formatAddress(sender),
+      sender_country: route.from.name,
+      sender_postal_code: sender.postalCode.trim(),
+      sender_phone: `+${route.from.phoneCode} ${sender.phone}`.trim(),
+      sender_address: formatAddress(sender, route.from),
       receiver_name: receiver.name.trim(),
-      receiver_phone: `+${receiver.countryCode} ${receiver.phone}`.trim(),
-      receiver_address: formatAddress(receiver),
+      receiver_country: route.to.name,
+      receiver_postal_code: receiver.postalCode.trim(),
+      receiver_phone: `+${route.to.phoneCode} ${receiver.phone}`.trim(),
+      receiver_address: formatAddress(receiver, route.to),
       field_values: fieldValues,
       notes: "",
     };
@@ -347,6 +380,7 @@ export default function BookShipmentPage() {
         </p>
         <div className="mt-6 flex flex-col gap-2">
           {customer && <Link to="/account/shipments" className="btn-primary text-center">View My Shipments</Link>}
+          <Link to="/track" className="btn-secondary text-center">Track this shipment</Link>
           <Link to="/services" className="btn-secondary text-center">Book another shipment</Link>
         </div>
       </div>
@@ -357,15 +391,29 @@ export default function BookShipmentPage() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10">
       <form onSubmit={submit} noValidate
         className="grid lg:grid-cols-[260px_1fr_1fr_300px] gap-5 items-start">
+        <fieldset className="card lg:col-span-4">
+          <legend className="px-1 text-sm font-bold text-gray-900">Choose shipping direction</legend>
+          <div className="grid sm:grid-cols-2 gap-3 mt-2">
+            {Object.entries(DIRECTIONS).map(([key, option]) => (
+              <label key={key}
+                className={`flex cursor-pointer items-center gap-3 rounded-xl border-2 p-3 transition-colors
+                  ${direction === key ? "border-brand-500 bg-brand-50" : "border-gray-200 hover:border-gray-300"}`}>
+                <input type="radio" name="route_direction" value={key}
+                  checked={direction === key} onChange={() => setDirection(key)} />
+                <span className="font-semibold text-gray-900">{option.label}</span>
+              </label>
+            ))}
+          </div>
+        </fieldset>
 
         {/* Hero column */}
         <div className="lg:row-span-3 lg:pr-4">
           <p className="text-xs font-bold uppercase tracking-widest text-brand-600 mb-3">Shipment Details</p>
           <h1 className="text-4xl font-extrabold text-gray-900 leading-tight mb-4">
-            Send {shortName.toLowerCase()} with less typing.
+            Send {shortName.toLowerCase()} from {route.from.name} to {route.to.name}.
           </h1>
           <p className="text-gray-500 mb-6">
-            Enter pickup and delivery details once. Required postal codes keep the route accurate.
+            Enter pickup and delivery details. Use the {route.from.postalLabel} for pickup and the {route.to.postalLabel} for delivery.
           </p>
           <ul className="space-y-3 text-sm text-gray-700">
             <li className="flex items-center gap-3"><FiCheck className="text-brand-600 shrink-0" /> Inline checks, no surprise errors</li>
@@ -375,9 +423,9 @@ export default function BookShipmentPage() {
         </div>
 
         <PartyCard letter="A" title="From" subtitle="Pickup contact and address" who="sender"
-          value={sender} onChange={setSender} errors={senderErrors} showErrors={showErrors} />
+          value={sender} onChange={setSender} errors={senderErrors} showErrors={showErrors} country={route.from} />
         <PartyCard letter="B" title="To" subtitle="Recipient and delivery address" who="receiver"
-          value={receiver} onChange={setReceiver} errors={receiverErrors} showErrors={showErrors} />
+          value={receiver} onChange={setReceiver} errors={receiverErrors} showErrors={showErrors} country={route.to} />
 
         {/* Sticky summary sidebar */}
         <div className="card lg:sticky lg:top-6 lg:row-span-3 space-y-3">
@@ -389,7 +437,8 @@ export default function BookShipmentPage() {
               </span>
               <div>
                 <p className="text-[10px] font-bold tracking-wide text-gray-400">FROM</p>
-                <p className="text-gray-900 font-semibold">{sender.postalCode || "Add pickup postal code"}</p>
+                <p className="text-gray-900 font-semibold">{sender.postalCode || `Enter ${route.from.postalLabel}`}</p>
+                <p className="text-xs text-gray-400">{route.from.shortName}</p>
               </div>
             </div>
             <div className="flex items-start gap-3">
@@ -398,7 +447,8 @@ export default function BookShipmentPage() {
               </span>
               <div>
                 <p className="text-[10px] font-bold tracking-wide text-gray-400">TO</p>
-                <p className="text-gray-900 font-semibold">{receiver.postalCode || "Add delivery postal code"}</p>
+                <p className="text-gray-900 font-semibold">{receiver.postalCode || `Enter ${route.to.postalLabel}`}</p>
+                <p className="text-xs text-gray-400">{route.to.shortName}</p>
               </div>
             </div>
           </div>
@@ -430,6 +480,27 @@ export default function BookShipmentPage() {
 
         {/* Details section under the two address cards */}
         <div className="lg:col-span-2 space-y-5">
+          <div className="card">
+            <div className="flex items-baseline justify-between mb-4">
+              <h2 className="font-bold text-gray-900 text-lg">Delivery service</h2>
+              <span className="text-xs text-gray-400">Choose how you want it to arrive.</span>
+            </div>
+            <div className="grid sm:grid-cols-3 gap-3">
+              {tiers.map((option) => (
+                <button key={option.id} type="button" onClick={() => setSelectedTierId(option.id)}
+                  aria-pressed={tier?.id === option.id}
+                  className={`rounded-xl border-2 p-3 text-left transition-colors
+                    ${tier?.id === option.id ? "border-brand-500 bg-brand-50" : "border-gray-200 hover:border-gray-300"}`}>
+                  <span className="text-xl">{option.icon || "📦"}</span>
+                  <span className="mt-2 block font-bold text-gray-900">{option.tier_name}</span>
+                  {option.description && <span className="mt-1 block text-xs text-gray-500">{option.description}</span>}
+                  {option.duration_label && <span className="mt-1 block text-xs text-gray-500">{option.duration_label}</span>}
+                  <span className="mt-3 block font-extrabold text-gray-900">{money(option.price)}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
           {!customer && (
             <div className="card">
               <p className="text-sm text-gray-500 mb-3">
