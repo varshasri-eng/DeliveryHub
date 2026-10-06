@@ -68,7 +68,8 @@ selected sub-service on new shipment bookings. Migration
 `005_remove_document_service_booking_fields.sql` removes the old Package size
 and admin-note questions from Document Services. Migration
 `006_remove_document_service_booking_fields.sql` removes all remaining dynamic
-booking questions from Document Services, including Pickup date.
+booking questions from Document Services except the configured date field,
+which it relabels as Date of Booking.
 
 ## Project structure
 

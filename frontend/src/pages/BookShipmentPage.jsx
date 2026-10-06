@@ -311,7 +311,18 @@ export default function BookShipmentPage() {
   const unitPrice = subservice ? Number(subservice.price) : Number(tier?.price || 0);
   const total = unitPrice * effectiveQty;
   const isDocumentService = ["document-services", "document-shipping"].includes(service.slug);
-  const fields = isDocumentService ? [] : service.fields || [];
+  const configuredFields = service.fields || [];
+  const documentDateField = isDocumentService
+    ? configuredFields.find((field) => field.field_type === "date") || {
+        id: "booking-date",
+        field_key: "booking_date",
+        field_type: "date",
+        label: "Date of Booking",
+      }
+    : null;
+  const fields = isDocumentService
+    ? [{ ...documentDateField, label: "Date of Booking" }]
+    : configuredFields;
   const shortName = service.name.replace(/\s+services?$/i, "");
 
   const setField = (key, value) => setFieldValues((prev) => ({ ...prev, [key]: value }));
@@ -549,8 +560,12 @@ export default function BookShipmentPage() {
           {fields.length > 0 && (
             <div className="card">
               <div className="flex items-baseline justify-between mb-4">
-                <h2 className="font-bold text-gray-900 text-lg">{shortName} details</h2>
-                <span className="text-xs text-gray-400">Choose the closest fit.</span>
+                <h2 className="font-bold text-gray-900 text-lg">
+                  {isDocumentService ? "Booking date" : `${shortName} details`}
+                </h2>
+                {!isDocumentService && (
+                  <span className="text-xs text-gray-400">Choose the closest fit.</span>
+                )}
               </div>
               <div className="grid lg:grid-cols-[minmax(0,1fr)_200px] gap-4 items-start">
                 {fields.map((f) => (
