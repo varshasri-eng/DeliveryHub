@@ -501,58 +501,35 @@ export default function BookShipmentPage() {
 
         {/* Details section under the two address cards */}
         <div className="lg:col-span-2 space-y-5">
-          <div className="card">
-            <div className="flex items-baseline justify-between mb-4">
-              <h2 className="font-bold text-gray-900 text-lg">Delivery service</h2>
-              <span className="text-xs text-gray-400">Choose how you want it to arrive.</span>
-            </div>
-            <div className="grid sm:grid-cols-3 gap-3">
-              {tiers.map((option) => (
-                <button key={option.id} type="button" onClick={() => {
-                  setSelectedTierId(option.id);
-                  setSelectedSubserviceId(option.sub_services?.[0]?.id ?? null);
-                }}
-                  aria-pressed={tier?.id === option.id}
-                  className={`rounded-xl border-2 p-3 text-left transition-colors
-                    ${tier?.id === option.id ? "border-brand-500 bg-brand-50" : "border-gray-200 hover:border-gray-300"}`}>
-                  <span className="text-xl">{option.icon || "📦"}</span>
-                  <span className="mt-2 block font-bold text-gray-900">{option.tier_name}</span>
-                  {option.description && <span className="mt-1 block text-xs text-gray-500">{option.description}</span>}
-                  {option.duration_label && <span className="mt-1 block text-xs text-gray-500">{option.duration_label}</span>}
-                  <span className="mt-3 block font-extrabold text-gray-900">{money(option.price)}</span>
-                </button>
-              ))}
-            </div>
-            {subservices.length > 0 && (
-              <div className="mt-5 border-t border-gray-100 pt-4">
-                <div className="flex items-baseline justify-between mb-3">
-                  <h3 className="font-bold text-gray-900">
-                    {tier.tier_name} sub-services
-                  </h3>
-                  <span className="text-xs text-gray-400">
-                    Choose one; its price is the booking price.
-                  </span>
-                </div>
-                <div className="grid sm:grid-cols-3 gap-3">
-                  {subservices.map((option) => (
-                    <button key={option.id} type="button"
-                      onClick={() => setSelectedSubserviceId(option.id)}
-                      aria-pressed={subservice?.id === option.id}
-                      className={`rounded-xl border-2 p-3 text-left transition-colors
-                        ${subservice?.id === option.id
-                          ? "border-brand-500 bg-brand-50"
-                          : "border-gray-200 hover:border-gray-300"}`}>
-                      <span className="text-xl">{option.icon || "📦"}</span>
-                      <span className="mt-2 block font-bold text-gray-900">{option.name}</span>
-                      <span className="mt-3 block font-extrabold text-gray-900">
-                        {money(option.price)}
-                      </span>
-                    </button>
-                  ))}
-                </div>
+          {subservices.length > 0 && (
+            <div className="card">
+              <div className="flex items-baseline justify-between mb-4">
+                <h2 className="font-bold text-gray-900 text-lg">
+                  {tier.tier_name} sub-services
+                </h2>
+                <span className="text-xs text-gray-400">
+                  Choose one; its price is the booking price.
+                </span>
               </div>
-            )}
-          </div>
+              <div className="grid sm:grid-cols-3 gap-3">
+                {subservices.map((option) => (
+                  <button key={option.id} type="button"
+                    onClick={() => setSelectedSubserviceId(option.id)}
+                    aria-pressed={subservice?.id === option.id}
+                    className={`rounded-xl border-2 p-3 text-left transition-colors
+                      ${subservice?.id === option.id
+                        ? "border-brand-500 bg-brand-50"
+                        : "border-gray-200 hover:border-gray-300"}`}>
+                    <span className="text-xl">{option.icon || "📦"}</span>
+                    <span className="mt-2 block font-bold text-gray-900">{option.name}</span>
+                    <span className="mt-3 block font-extrabold text-gray-900">
+                      {money(option.price)}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {!customer && (
             <div className="card">

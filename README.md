@@ -57,7 +57,9 @@ contains the previous order-based invoice design. The SQL migration scripts in `
 delivery-option fields and update legacy default branding; they do not convert
 the old order-based invoice schema. Migration `004_add_pricing_tier_subservices.sql`
 adds editable sub-services under Express and Standard tiers and stores the
-selected sub-service on new shipment bookings.
+selected sub-service on new shipment bookings. Migration
+`005_remove_document_service_booking_fields.sql` removes the old Package size
+and admin-note questions from Document Services.
 
 ## Project structure
 
