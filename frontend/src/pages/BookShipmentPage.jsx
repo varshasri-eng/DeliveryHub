@@ -310,7 +310,8 @@ export default function BookShipmentPage() {
   const effectiveQty = service.enable_quantity ? quantity : 1;
   const unitPrice = subservice ? Number(subservice.price) : Number(tier?.price || 0);
   const total = unitPrice * effectiveQty;
-  const fields = service.fields || [];
+  const isDocumentService = ["document-services", "document-shipping"].includes(service.slug);
+  const fields = isDocumentService ? [] : service.fields || [];
   const shortName = service.name.replace(/\s+services?$/i, "");
 
   const setField = (key, value) => setFieldValues((prev) => ({ ...prev, [key]: value }));

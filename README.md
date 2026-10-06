@@ -52,6 +52,13 @@ values on the server, apply the applicable database migrations, and then run:
 docker compose up -d --build
 ```
 
+SQL files in `db/migrations/` are not run automatically by `docker compose up`.
+Apply the migrations explicitly before restarting containers. Migration
+`006_remove_document_service_booking_fields.sql` removes all dynamic booking
+questions configured for Document Services; without applying it, fields saved
+in the server database (such as Package size or Pickup date) remain visible and
+required.
+
 Do not use the current legacy `db/schema.sql` as a DeliveryHub schema: it still
 contains the previous order-based invoice design. The SQL migration scripts in `db/migrations/` add the current shipment and
 delivery-option fields and update legacy default branding; they do not convert
@@ -59,7 +66,9 @@ the old order-based invoice schema. Migration `004_add_pricing_tier_subservices.
 adds editable sub-services under Express and Standard tiers and stores the
 selected sub-service on new shipment bookings. Migration
 `005_remove_document_service_booking_fields.sql` removes the old Package size
-and admin-note questions from Document Services.
+and admin-note questions from Document Services. Migration
+`006_remove_document_service_booking_fields.sql` removes all remaining dynamic
+booking questions from Document Services, including Pickup date.
 
 ## Project structure
 
