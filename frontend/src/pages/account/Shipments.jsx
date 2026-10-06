@@ -122,6 +122,9 @@ export default function Shipments() {
                       ${Number(shipment.total_price).toFixed(2)}
                     </span>
                   </div>
+                  {shipment.sub_service_name && (
+                    <p className="text-sm text-gray-500">{shipment.sub_service_name}</p>
+                  )}
                   <p className="text-xs text-gray-400 flex items-center gap-1">
                     <FiMapPin size={11} /> {shipment.sender_name} → {shipment.receiver_name}
                   </p>
@@ -301,6 +304,7 @@ function InvoiceModal({ shipment, paymentSettings, onClose, onPrint, onPaymentSu
                 <tr>
                   <td className="p-3 text-sm font-medium border-b border-gray-100">
                     {shipment.service_name} — {shipment.tier_name}
+                    {shipment.sub_service_name ? ` — ${shipment.sub_service_name}` : ""}
                   </td>
                   <td className="p-3 text-sm text-center border-b border-gray-100">{shipment.quantity}</td>
                   <td className="p-3 text-sm text-right border-b border-gray-100">

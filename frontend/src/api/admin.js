@@ -88,6 +88,13 @@ export const updatePricingTier = (tierId, data) =>
 export const deletePricingTier = (tierId) =>
   api.delete(`/admin/services/pricing-tiers/${tierId}`);
 
+export const addPricingSubservice = (tierId, data) =>
+  api.post(`/admin/services/pricing-tiers/${tierId}/sub-services`, data);
+export const updatePricingSubservice = (subserviceId, data) =>
+  api.put(`/admin/services/sub-services/${subserviceId}`, data);
+export const deletePricingSubservice = (subserviceId) =>
+  api.delete(`/admin/services/sub-services/${subserviceId}`);
+
 export const addField = (serviceId, data) =>
   api.post(`/admin/services/${serviceId}/fields`, data);
 export const updateField = (fieldId, data) =>

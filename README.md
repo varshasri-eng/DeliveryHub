@@ -55,7 +55,9 @@ docker compose up -d --build
 Do not use the current legacy `db/schema.sql` as a DeliveryHub schema: it still
 contains the previous order-based invoice design. The SQL migration scripts in `db/migrations/` add the current shipment and
 delivery-option fields and update legacy default branding; they do not convert
-the old order-based invoice schema.
+the old order-based invoice schema. Migration `004_add_pricing_tier_subservices.sql`
+adds editable sub-services under Express and Standard tiers and stores the
+selected sub-service on new shipment bookings.
 
 ## Project structure
 

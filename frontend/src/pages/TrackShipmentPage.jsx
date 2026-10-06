@@ -80,6 +80,9 @@ export default function TrackShipmentPage() {
           <div className="mt-4 border-t border-gray-100 pt-4 text-sm">
             <p className="font-semibold text-gray-800">{shipment.service_name}</p>
             <p className="mt-1 text-gray-500">{shipment.tier_name}</p>
+            {shipment.sub_service_name && (
+              <p className="mt-1 text-gray-500">{shipment.sub_service_name}</p>
+            )}
             {shipment.created_at && (
               <p className="mt-3 text-xs text-gray-400">
                 Booked {new Date(shipment.created_at).toLocaleDateString()}

@@ -21,6 +21,9 @@ DELETE /api/admin/restrictions/<item_id>           - remove         [write]
 POST   /api/admin/services/<id>/pricing-tiers      - add a tier     [write]
 PUT    /api/admin/pricing-tiers/<tier_id>          - edit a tier    [write]
 DELETE /api/admin/pricing-tiers/<tier_id>          - remove         [write]
+POST   /api/admin/pricing-tiers/<tier_id>/sub-services - add a sub-service [write]
+PUT    /api/admin/sub-services/<id>                - edit a sub-service [write]
+DELETE /api/admin/sub-services/<id>                - remove a sub-service [write]
 
 -- Intake fields (the customer booking form) --
 POST   /api/admin/services/<id>/fields             - add a field    [write]
@@ -33,7 +36,7 @@ from flask import Blueprint, request, jsonify
 from app import db
 from app.models.service_type import (
     ServiceType, ServiceCoverageItem, ServiceRestriction,
-    ServicePricingTier, ServiceField, VALID_FIELD_TYPES,
+    ServicePricingTier, ServiceSubservice, ServiceField, VALID_FIELD_TYPES,
 )
 from app.utils.auth import permission_required
 
@@ -49,6 +52,27 @@ DEFAULT_PRICING_TIERS = (
     ("Economy", "Lower cost when time is flexible", "10-15 business days", 55, "💰"),
     ("Group", "Best value for flexible delivery", "15-25 business days", 45, "👥"),
 )
+
+DEFAULT_SUBSERVICES = (
+    ("Same Day Label", 80, "⚡"),
+    ("Next Day Label", 75, "🚚"),
+    ("Non Metros → 2 Hop Shipping", 80, "📦"),
+)
+
+
+def _seed_default_subservices(tier):
+    normalized_name = re.sub(r"\s+", " ", tier.tier_name.strip().lower())
+    if normalized_name not in {"express", "express shipping", "standard", "standard shipping"}:
+        return
+    tier.sub_services.extend(
+        ServiceSubservice(
+            name=name,
+            price=price,
+            icon=icon,
+            display_order=order,
+        )
+        for order, (name, price, icon) in enumerate(DEFAULT_SUBSERVICES)
+    )
 
 
 # ── SERVICE TYPES ────────────────────────────────────────────
@@ -84,14 +108,16 @@ def create_service(customer):
     )
     db.session.add(service)
     for display_order, (tier_name, description, duration_label, price, icon) in enumerate(DEFAULT_PRICING_TIERS):
-        service.pricing_tiers.append(ServicePricingTier(
+        tier = ServicePricingTier(
             tier_name=tier_name,
             description=description,
             duration_label=duration_label,
             price=price,
             icon=icon,
             display_order=display_order,
-        ))
+        )
+        _seed_default_subservices(tier)
+        service.pricing_tiers.append(tier)
     db.session.commit()
     return jsonify({"message": "Service created.", "service": service.to_dict(include_details=True)}), 201
 
@@ -270,6 +296,7 @@ def add_pricing_tier(customer, service_id):
         icon=(data.get("icon") or "").strip() or None,
         display_order=int(data.get("display_order") or 0),
     )
+    _seed_default_subservices(tier)
     db.session.add(tier)
     db.session.commit()
     return jsonify({"message": "Pricing tier added.", "tier": tier.to_dict()}), 201
@@ -310,6 +337,87 @@ def delete_pricing_tier(customer, tier_id):
     db.session.delete(tier)
     db.session.commit()
     return jsonify({"message": "Pricing tier removed."}), 200
+
+
+# ── PRICING-TIER SUB-SERVICES ────────────────────────────────
+@admin_services_bp.route("/pricing-tiers/<int:tier_id>/sub-services", methods=["POST"])
+@permission_required("write")
+def add_sub_service(customer, tier_id):
+    tier = ServicePricingTier.query.get(tier_id)
+    if not tier:
+        return jsonify({"error": "Pricing tier not found."}), 404
+
+    data = request.get_json(silent=True) or {}
+    name = (data.get("name") or "").strip()
+    if not name:
+        return jsonify({"error": "Sub-service name is required."}), 400
+    try:
+        price = float(data.get("price"))
+    except (TypeError, ValueError):
+        return jsonify({"error": "A valid sub-service price is required."}), 400
+    if price < 0:
+        return jsonify({"error": "Sub-service price cannot be negative."}), 400
+    if any(item.name.casefold() == name.casefold() for item in tier.sub_services):
+        return jsonify({"error": "A sub-service with this name already exists for this tier."}), 409
+
+    sub_service = ServiceSubservice(
+        pricing_tier=tier,
+        name=name,
+        price=price,
+        icon=(data.get("icon") or "").strip() or None,
+        display_order=int(data.get("display_order") or len(tier.sub_services)),
+    )
+    db.session.add(sub_service)
+    db.session.commit()
+    return jsonify({"message": "Sub-service added.", "sub_service": sub_service.to_dict()}), 201
+
+
+@admin_services_bp.route("/sub-services/<int:sub_service_id>", methods=["PUT"])
+@permission_required("write")
+def update_sub_service(customer, sub_service_id):
+    sub_service = ServiceSubservice.query.get(sub_service_id)
+    if not sub_service:
+        return jsonify({"error": "Sub-service not found."}), 404
+
+    data = request.get_json(silent=True) or {}
+    if "name" in data:
+        name = (data["name"] or "").strip()
+        if not name:
+            return jsonify({"error": "Sub-service name is required."}), 400
+        duplicates = ServiceSubservice.query.filter(
+            ServiceSubservice.pricing_tier_id == sub_service.pricing_tier_id,
+            db.func.lower(ServiceSubservice.name) == name.lower(),
+            ServiceSubservice.id != sub_service.id,
+        ).first()
+        if duplicates:
+            return jsonify({"error": "A sub-service with this name already exists for this tier."}), 409
+        sub_service.name = name
+    if "price" in data:
+        try:
+            price = float(data["price"])
+        except (TypeError, ValueError):
+            return jsonify({"error": "A valid sub-service price is required."}), 400
+        if price < 0:
+            return jsonify({"error": "Sub-service price cannot be negative."}), 400
+        sub_service.price = price
+    if "icon" in data:
+        sub_service.icon = (data["icon"] or "").strip() or None
+    if "display_order" in data:
+        sub_service.display_order = int(data["display_order"] or 0)
+
+    db.session.commit()
+    return jsonify({"message": "Sub-service updated.", "sub_service": sub_service.to_dict()}), 200
+
+
+@admin_services_bp.route("/sub-services/<int:sub_service_id>", methods=["DELETE"])
+@permission_required("write")
+def delete_sub_service(customer, sub_service_id):
+    sub_service = ServiceSubservice.query.get(sub_service_id)
+    if not sub_service:
+        return jsonify({"error": "Sub-service not found."}), 404
+    db.session.delete(sub_service)
+    db.session.commit()
+    return jsonify({"message": "Sub-service removed."}), 200
 
 
 # ── INTAKE FIELDS ────────────────────────────────────────────

@@ -18,6 +18,12 @@ class Shipment(db.Model):
     route_direction = db.Column(db.String(10), nullable=True)
     service_type_id = db.Column(db.Integer, db.ForeignKey("service_types.id"), nullable=False)
     pricing_tier_id = db.Column(db.Integer, db.ForeignKey("service_pricing_tiers.id"), nullable=False)
+    sub_service_id = db.Column(
+        db.Integer,
+        db.ForeignKey("service_subservices.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    sub_service_name = db.Column(db.String(255))
 
     quantity = db.Column(db.Integer, default=1)
     unit_price = db.Column(db.Numeric(10, 2), nullable=False)
@@ -42,6 +48,7 @@ class Shipment(db.Model):
 
     service_type = db.relationship("ServiceType")
     pricing_tier = db.relationship("ServicePricingTier")
+    sub_service = db.relationship("ServiceSubservice")
 
     def to_dict(self, include_invoice=True):
         data = {
@@ -53,6 +60,8 @@ class Shipment(db.Model):
             "service_name": self.service_type.name if self.service_type else None,
             "pricing_tier_id": self.pricing_tier_id,
             "tier_name": self.pricing_tier.tier_name if self.pricing_tier else None,
+            "sub_service_id": self.sub_service_id,
+            "sub_service_name": self.sub_service_name,
             "quantity": self.quantity,
             "unit_price": float(self.unit_price),
             "total_price": float(self.total_price),

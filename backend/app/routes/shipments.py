@@ -26,7 +26,7 @@ from flask import Blueprint, request, jsonify, current_app
 from werkzeug.utils import secure_filename
 from app import db
 from app.models.shipment import Shipment, generate_shipment_number
-from app.models.service_type import ServiceType, ServicePricingTier
+from app.models.service_type import ServiceType, ServicePricingTier, ServiceSubservice
 from app.utils.auth import login_required
 
 shipments_bp = Blueprint("shipments", __name__)
@@ -66,8 +66,8 @@ def _validate_booking(data):
     pricing tier, quantity, sender/receiver info, and the service's
     admin-defined fields.
 
-    Returns (service, tier, quantity, field_values, sender, receiver,
-    error_response). error_response is None on success; on failure
+    Returns (service, tier, sub_service, quantity, field_values, sender,
+    receiver, error_response). error_response is None on success; on failure
     it's a (jsonify(...), status_code) tuple the caller should return
     immediately.
     """
@@ -76,7 +76,7 @@ def _validate_booking(data):
 
     service = ServiceType.query.filter_by(id=service_type_id, is_active=True).first()
     if not service:
-        return None, None, None, None, None, None, (
+        return None, None, None, None, None, None, None, (
             jsonify({"error": "Service not found."}), 404
         )
 
@@ -84,8 +84,28 @@ def _validate_booking(data):
         id=pricing_tier_id, service_type_id=service.id
     ).first()
     if not tier:
-        return None, None, None, None, None, None, (
+        return None, None, None, None, None, None, None, (
             jsonify({"error": "Selected pricing tier does not belong to this service."}), 400
+        )
+
+    sub_service_id = data.get("sub_service_id")
+    sub_service = None
+    if tier.sub_services:
+        if sub_service_id is None:
+            return None, None, None, None, None, None, None, (
+                jsonify({"error": "Choose a sub-service for this delivery option."}), 400
+            )
+        sub_service = ServiceSubservice.query.filter_by(
+            id=sub_service_id,
+            pricing_tier_id=tier.id,
+        ).first()
+        if not sub_service:
+            return None, None, None, None, None, None, None, (
+                jsonify({"error": "Selected sub-service does not belong to this delivery option."}), 400
+            )
+    elif sub_service_id is not None:
+        return None, None, None, None, None, None, None, (
+            jsonify({"error": "Selected sub-service does not belong to this delivery option."}), 400
         )
 
     # ── quantity ─────────────────────────────────────────────
@@ -96,7 +116,7 @@ def _validate_booking(data):
         except (TypeError, ValueError):
             quantity = 0
         if quantity <= 0:
-            return None, None, None, None, None, None, (
+            return None, None, None, None, None, None, None, (
                 jsonify({"error": "Quantity must be a positive integer."}), 400
             )
 
@@ -113,7 +133,7 @@ def _validate_booking(data):
     }
     for role, info in (("Sender", sender), ("Receiver", receiver)):
         if not info["name"] or not info["phone"] or not info["address"]:
-            return None, None, None, None, None, None, (
+            return None, None, None, None, None, None, None, (
                 jsonify({"error": f"{role} name, phone, and address are all required."}), 400
             )
 
@@ -130,14 +150,14 @@ def _validate_booking(data):
             # Checkboxes are the one type where "unchecked" is a real,
             # valid answer — presence, not truthiness, is what's required.
             if field.field_key not in submitted_values:
-                return None, None, None, None, None, None, (
+                return None, None, None, None, None, None, None, (
                     jsonify({"error": f"'{field.label}' is required."}), 400
                 )
             field_values[field.field_key] = bool(value)
             continue
 
         if value is None or (isinstance(value, str) and not value.strip()):
-            return None, None, None, None, None, None, (
+            return None, None, None, None, None, None, None, (
                 jsonify({"error": f"'{field.label}' is required."}), 400
             )
 
@@ -145,23 +165,23 @@ def _validate_booking(data):
             try:
                 value = float(value)
             except (TypeError, ValueError):
-                return None, None, None, None, None, None, (
+                return None, None, None, None, None, None, None, (
                     jsonify({"error": f"'{field.label}' must be a number."}), 400
                 )
         elif field.field_type == "select":
             options = field.options or []
             if value not in options:
-                return None, None, None, None, None, None, (
+                return None, None, None, None, None, None, None, (
                     jsonify({"error": f"'{field.label}' must be one of: {options}"}), 400
                 )
 
         field_values[field.field_key] = value
 
-    return service, tier, quantity, field_values, sender, receiver, None
+    return service, tier, sub_service, quantity, field_values, sender, receiver, None
 
 
-def _price_booking(tier, quantity):
-    unit_price = float(tier.price)
+def _price_booking(tier, sub_service, quantity):
+    unit_price = float(sub_service.price if sub_service else tier.price)
     total_price = round(unit_price * quantity, 2)
     return unit_price, total_price
 
@@ -201,11 +221,11 @@ def create_shipment(customer):
     if route_error:
         return route_error
 
-    service, tier, quantity, field_values, sender, receiver, err = _validate_booking(data)
+    service, tier, sub_service, quantity, field_values, sender, receiver, err = _validate_booking(data)
     if err:
         return err
 
-    unit_price, total_price = _price_booking(tier, quantity)
+    unit_price, total_price = _price_booking(tier, sub_service, quantity)
 
     shipment = Shipment(
         shipment_number=generate_shipment_number(),
@@ -213,6 +233,8 @@ def create_shipment(customer):
         route_direction=route_direction,
         service_type_id=service.id,
         pricing_tier_id=tier.id,
+        sub_service_id=sub_service.id if sub_service else None,
+        sub_service_name=sub_service.name if sub_service else None,
         quantity=quantity,
         unit_price=unit_price,
         total_price=total_price,
@@ -271,11 +293,11 @@ def create_guest_shipment():
         db.session.add(customer)
         db.session.flush()
 
-    service, tier, quantity, field_values, sender, receiver, err = _validate_booking(data)
+    service, tier, sub_service, quantity, field_values, sender, receiver, err = _validate_booking(data)
     if err:
         return err
 
-    unit_price, total_price = _price_booking(tier, quantity)
+    unit_price, total_price = _price_booking(tier, sub_service, quantity)
 
     shipment = Shipment(
         shipment_number=generate_shipment_number(),
@@ -283,6 +305,8 @@ def create_guest_shipment():
         route_direction=route_direction,
         service_type_id=service.id,
         pricing_tier_id=tier.id,
+        sub_service_id=sub_service.id if sub_service else None,
+        sub_service_name=sub_service.name if sub_service else None,
         quantity=quantity,
         unit_price=unit_price,
         total_price=total_price,
@@ -385,6 +409,7 @@ def track_shipment(shipment_number):
             "shipment_number": shipment.shipment_number,
             "service_name": shipment.service_type.name if shipment.service_type else None,
             "tier_name": shipment.pricing_tier.tier_name if shipment.pricing_tier else None,
+            "sub_service_name": shipment.sub_service_name,
             "status": shipment.status,
             "created_at": shipment.created_at.isoformat() if shipment.created_at else None,
             "updated_at": shipment.updated_at.isoformat() if shipment.updated_at else None,

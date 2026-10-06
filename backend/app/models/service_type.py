@@ -89,12 +89,41 @@ class ServicePricingTier(db.Model):
     icon = db.Column(db.String(20))
     display_order = db.Column(db.Integer, default=0)
 
+    sub_services = db.relationship("ServiceSubservice", backref="pricing_tier",
+                                  order_by="ServiceSubservice.display_order",
+                                  cascade="all, delete-orphan")
+
     def to_dict(self):
         return {
             "id": self.id,
             "tier_name": self.tier_name,
             "description": self.description,
             "duration_label": self.duration_label,
+            "price": float(self.price),
+            "icon": self.icon,
+            "display_order": self.display_order,
+            "sub_services": [sub_service.to_dict() for sub_service in self.sub_services],
+        }
+
+
+class ServiceSubservice(db.Model):
+    __tablename__ = "service_subservices"
+
+    id = db.Column(db.Integer, primary_key=True)
+    pricing_tier_id = db.Column(
+        db.Integer,
+        db.ForeignKey("service_pricing_tiers.id", ondelete="CASCADE"),
+        nullable=False,
+    )
+    name = db.Column(db.String(255), nullable=False)
+    price = db.Column(db.Numeric(10, 2), nullable=False)
+    icon = db.Column(db.String(20))
+    display_order = db.Column(db.Integer, default=0)
+
+    def to_dict(self):
+        return {
+            "id": self.id,
+            "name": self.name,
             "price": float(self.price),
             "icon": self.icon,
             "display_order": self.display_order,

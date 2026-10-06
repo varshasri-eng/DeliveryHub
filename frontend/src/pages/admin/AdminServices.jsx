@@ -6,6 +6,7 @@ import {
   addCoverageItem, updateCoverageItem, deleteCoverageItem,
   addRestriction, updateRestriction, deleteRestriction,
   addPricingTier, updatePricingTier, deletePricingTier,
+  addPricingSubservice, updatePricingSubservice, deletePricingSubservice,
   addField, updateField, deleteField,
 } from "../../api/admin";
 
@@ -65,7 +66,90 @@ function BulletListEditor({ title, items, onAdd, onUpdate, onDelete }) {
 }
 
 /* ── Pricing tiers editor ── */
-function TiersEditor({ tiers, onAdd, onUpdate, onDelete }) {
+function SubservicesEditor({ tier, onAdd, onUpdate, onDelete }) {
+  const empty = { name: "", price: "", icon: "" };
+  const [draft, setDraft] = useState(empty);
+  const [editingId, setEditingId] = useState(null);
+  const [editDraft, setEditDraft] = useState(empty);
+  const subservices = tier.sub_services || [];
+
+  const submitAdd = async () => {
+    if (!draft.name.trim() || draft.price === "") {
+      toast.error("Sub-service name and price are required.");
+      return;
+    }
+    await onAdd(tier.id, { ...draft, price: Number(draft.price), display_order: subservices.length });
+    setDraft(empty);
+  };
+
+  return (
+    <div className="mt-3 border-t border-gray-100 pt-3">
+      <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
+        Sub-services for {tier.tier_name}
+      </p>
+      <div className="space-y-2 mb-3">
+        {subservices.map((subservice) => (
+          <div key={subservice.id} className="flex items-center gap-2">
+            {editingId === subservice.id ? (
+              <>
+                <input className="input flex-1" placeholder="Name" value={editDraft.name}
+                  onChange={(e) => setEditDraft({ ...editDraft, name: e.target.value })} />
+                <input className="input w-24" type="number" min="0" step="0.01" placeholder="Price"
+                  value={editDraft.price}
+                  onChange={(e) => setEditDraft({ ...editDraft, price: e.target.value })} />
+                <input className="input w-20" placeholder="Icon" value={editDraft.icon}
+                  onChange={(e) => setEditDraft({ ...editDraft, icon: e.target.value })} />
+                <button type="button" onClick={async () => {
+                  await onUpdate(subservice.id, {
+                    ...editDraft,
+                    price: Number(editDraft.price),
+                  });
+                  setEditingId(null);
+                }} className="text-xs font-semibold text-brand-600">Save</button>
+                <button type="button" onClick={() => setEditingId(null)}
+                  className="text-xs text-gray-400">Cancel</button>
+              </>
+            ) : (
+              <>
+                <span className="text-lg">{subservice.icon || "📦"}</span>
+                <span className="flex-1 text-sm text-gray-800">{subservice.name}</span>
+                <span className="text-sm font-bold text-gray-900">${Number(subservice.price).toFixed(2)}</span>
+                <button type="button" onClick={() => {
+                  setEditingId(subservice.id);
+                  setEditDraft({
+                    name: subservice.name,
+                    price: subservice.price,
+                    icon: subservice.icon || "",
+                  });
+                }} className="text-gray-400 hover:text-gray-700"><FiEdit2 size={14} /></button>
+                <button type="button" onClick={() => onDelete(subservice.id)}
+                  className="text-gray-400 hover:text-red-600"><FiTrash2 size={14} /></button>
+              </>
+            )}
+          </div>
+        ))}
+        {subservices.length === 0 && (
+          <p className="text-sm text-gray-400">No sub-services added.</p>
+        )}
+      </div>
+      <div className="grid grid-cols-[1fr_100px_80px_auto] gap-2">
+        <input className="input" placeholder="Sub-service name" value={draft.name}
+          onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+        <input className="input" type="number" min="0" step="0.01" placeholder="Price"
+          value={draft.price} onChange={(e) => setDraft({ ...draft, price: e.target.value })} />
+        <input className="input" placeholder="Icon" value={draft.icon}
+          onChange={(e) => setDraft({ ...draft, icon: e.target.value })} />
+        <button type="button" onClick={submitAdd}
+          className="px-3 rounded-lg bg-brand-500 text-white hover:bg-brand-600"><FiPlus /></button>
+      </div>
+    </div>
+  );
+}
+
+function TiersEditor({
+  tiers, onAdd, onUpdate, onDelete,
+  onAddSubservice, onUpdateSubservice, onDeleteSubservice,
+}) {
   const empty = { tier_name: "", description: "", duration_label: "", price: "", icon: "" };
   const [draft, setDraft] = useState(empty);
   const [editingId, setEditingId] = useState(null);
@@ -125,6 +209,10 @@ function TiersEditor({ tiers, onAdd, onUpdate, onDelete }) {
                 </div>
               </div>
             )}
+            <SubservicesEditor tier={t}
+              onAdd={onAddSubservice}
+              onUpdate={onUpdateSubservice}
+              onDelete={onDeleteSubservice} />
           </div>
         ))}
         {tiers.length === 0 && <p className="text-sm text-gray-400">No delivery options yet — add at least one option to make this service bookable.</p>}
@@ -380,7 +468,10 @@ function ServiceEditor({ serviceId, onBack, onDeleted }) {
       <TiersEditor tiers={service.pricing_tiers}
         onAdd={async (data) => { await addPricingTier(service.id, { ...data, display_order: service.pricing_tiers.length }); load(); }}
         onUpdate={async (id, data) => { await updatePricingTier(id, data); load(); }}
-        onDelete={async (id) => { await deletePricingTier(id); load(); }} />
+        onDelete={async (id) => { await deletePricingTier(id); load(); }}
+        onAddSubservice={async (id, data) => { await addPricingSubservice(id, data); load(); }}
+        onUpdateSubservice={async (id, data) => { await updatePricingSubservice(id, data); load(); }}
+        onDeleteSubservice={async (id) => { await deletePricingSubservice(id); load(); }} />
 
       <FieldsEditor fields={service.fields}
         onAdd={async (data) => { await addField(service.id, { ...data, display_order: service.fields.length }); load(); }}

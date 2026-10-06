@@ -13,6 +13,7 @@ from app.models.service_type import (
     ServiceCoverageItem,
     ServiceRestriction,
     ServicePricingTier,
+    ServiceSubservice,
     ServiceField,
 )
 from app.models.shipment import Shipment

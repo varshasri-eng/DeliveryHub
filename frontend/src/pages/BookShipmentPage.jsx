@@ -230,6 +230,7 @@ export default function BookShipmentPage() {
 
   const requestedTierId = Number(searchParams.get("tier"));
   const [selectedTierId, setSelectedTierId] = useState(null);
+  const [selectedSubserviceId, setSelectedSubserviceId] = useState(null);
   const quantity = Math.max(1, parseInt(searchParams.get("qty"), 10) || 1);
   const route = DIRECTIONS[direction];
 
@@ -260,6 +261,16 @@ export default function BookShipmentPage() {
   }, [slug, requestedTierId]);
 
   useEffect(() => {
+    const subservices = service?.pricing_tiers
+      ?.find((pricingTier) => pricingTier.id === selectedTierId)?.sub_services || [];
+    setSelectedSubserviceId((current) => (
+      subservices.some((subservice) => subservice.id === current)
+        ? current
+        : subservices[0]?.id ?? null
+    ));
+  }, [service, selectedTierId]);
+
+  useEffect(() => {
     if (!customer) return;
     const phone = customer.phone && !customer.phone.startsWith("guest-")
       ? customer.phone.replace(/\D/g, "").replace(/^(?:1|91)(?=\d{10}$)/, "")
@@ -282,6 +293,8 @@ export default function BookShipmentPage() {
 
   const tiers = service.pricing_tiers || [];
   const tier = tiers.find((t) => t.id === selectedTierId);
+  const subservices = tier?.sub_services || [];
+  const subservice = subservices.find((item) => item.id === selectedSubserviceId);
 
   if (tiers.length === 0) {
     return (
@@ -295,7 +308,8 @@ export default function BookShipmentPage() {
   }
 
   const effectiveQty = service.enable_quantity ? quantity : 1;
-  const total = tier ? Number(tier.price) * effectiveQty : 0;
+  const unitPrice = subservice ? Number(subservice.price) : Number(tier?.price || 0);
+  const total = unitPrice * effectiveQty;
   const fields = service.fields || [];
   const shortName = service.name.replace(/\s+services?$/i, "");
 
@@ -312,7 +326,7 @@ export default function BookShipmentPage() {
     }
   });
   const emailError = !customer && !/^\S+@\S+\.\S+$/.test(guestEmail.trim()) ? "Enter a valid email." : "";
-  const hasErrors = !tier ||
+  const hasErrors = !tier || (subservices.length > 0 && !subservice) ||
     Object.keys(senderErrors).length || Object.keys(receiverErrors).length ||
     Object.keys(fieldErrors).length || emailError;
 
@@ -334,6 +348,7 @@ export default function BookShipmentPage() {
       route_direction: direction,
       service_type_id: service.id,
       pricing_tier_id: tier?.id,
+      sub_service_id: subservice?.id ?? null,
       quantity: effectiveQty,
       sender_name: sender.name.trim(),
       sender_country: route.from.name,
@@ -459,6 +474,12 @@ export default function BookShipmentPage() {
                 <span className="text-gray-900 font-semibold">{selectedOpt ? splitOption(selectedOpt).title : "—"}</span>
               </div>
             )}
+            {subservice && (
+              <div className="flex justify-between gap-3">
+                <span className="text-gray-400">Delivery sub-service</span>
+                <span className="text-gray-900 font-semibold text-right">{subservice.name}</span>
+              </div>
+            )}
             {summaryDateField && (
               <div className="flex justify-between">
                 <span className="text-gray-400">{summaryDateField.label.replace(/\s+date$/i, "")}</span>
@@ -487,7 +508,10 @@ export default function BookShipmentPage() {
             </div>
             <div className="grid sm:grid-cols-3 gap-3">
               {tiers.map((option) => (
-                <button key={option.id} type="button" onClick={() => setSelectedTierId(option.id)}
+                <button key={option.id} type="button" onClick={() => {
+                  setSelectedTierId(option.id);
+                  setSelectedSubserviceId(option.sub_services?.[0]?.id ?? null);
+                }}
                   aria-pressed={tier?.id === option.id}
                   className={`rounded-xl border-2 p-3 text-left transition-colors
                     ${tier?.id === option.id ? "border-brand-500 bg-brand-50" : "border-gray-200 hover:border-gray-300"}`}>
@@ -499,6 +523,35 @@ export default function BookShipmentPage() {
                 </button>
               ))}
             </div>
+            {subservices.length > 0 && (
+              <div className="mt-5 border-t border-gray-100 pt-4">
+                <div className="flex items-baseline justify-between mb-3">
+                  <h3 className="font-bold text-gray-900">
+                    {tier.tier_name} sub-services
+                  </h3>
+                  <span className="text-xs text-gray-400">
+                    Choose one; its price is the booking price.
+                  </span>
+                </div>
+                <div className="grid sm:grid-cols-3 gap-3">
+                  {subservices.map((option) => (
+                    <button key={option.id} type="button"
+                      onClick={() => setSelectedSubserviceId(option.id)}
+                      aria-pressed={subservice?.id === option.id}
+                      className={`rounded-xl border-2 p-3 text-left transition-colors
+                        ${subservice?.id === option.id
+                          ? "border-brand-500 bg-brand-50"
+                          : "border-gray-200 hover:border-gray-300"}`}>
+                      <span className="text-xl">{option.icon || "📦"}</span>
+                      <span className="mt-2 block font-bold text-gray-900">{option.name}</span>
+                      <span className="mt-3 block font-extrabold text-gray-900">
+                        {money(option.price)}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {!customer && (

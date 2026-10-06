@@ -22,7 +22,7 @@ def create_app():
             Household, HouseholdMember,
             Session, OTPVerification,
             SiteSettings, PaymentSettings, StaticPage,
-            ServiceType, ServiceCoverageItem, ServiceRestriction,
+            ServiceType, ServiceCoverageItem, ServiceRestriction, ServiceSubservice,
             ServicePricingTier, ServiceField,
             Shipment, Invoice, InvoiceItem,
         )

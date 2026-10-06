@@ -132,7 +132,10 @@ export default function AdminShipments() {
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0 cursor-pointer" onClick={() => setSelected(s)}>
                   <p className="font-semibold text-gray-900">{s.shipment_number}</p>
-                  <p className="text-sm text-gray-600 mt-0.5">{s.service_name} — {s.tier_name}</p>
+                  <p className="text-sm text-gray-600 mt-0.5">
+                    {s.service_name} — {s.tier_name}
+                    {s.sub_service_name ? ` — ${s.sub_service_name}` : ""}
+                  </p>
                   <p className="text-xs text-gray-400 mt-1">
                     {s.sender_name} → {s.receiver_name}
                   </p>
@@ -202,7 +205,10 @@ function ShipmentDetailModal({ shipment, onClose }) {
         <div className="p-6 space-y-5 text-sm">
           <div>
             <p className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-2">Service</p>
-            <p className="text-gray-900 font-medium">{shipment.service_name} — {shipment.tier_name}</p>
+            <p className="text-gray-900 font-medium">
+              {shipment.service_name} — {shipment.tier_name}
+              {shipment.sub_service_name ? ` — ${shipment.sub_service_name}` : ""}
+            </p>
             <p className="text-gray-500 mt-0.5">
               Qty {shipment.quantity} · ${Number(shipment.total_price).toFixed(2)}
             </p>
