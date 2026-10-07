@@ -227,6 +227,7 @@ export default function BookShipmentPage() {
 
   const [service, setService] = useState(null);
   const [notFound, setNotFound] = useState(false);
+  const [loadError, setLoadError] = useState("");
   const [direction, setDirection] = useState("US_TO_IN");
   const [sender, setSender] = useState(emptyParty());
   const [receiver, setReceiver] = useState(emptyParty());
@@ -243,6 +244,9 @@ export default function BookShipmentPage() {
   const route = DIRECTIONS[direction];
 
   useEffect(() => {
+    setService(null);
+    setNotFound(false);
+    setLoadError("");
     getService(slug)
       .then((res) => {
         const svc = res.data.service;
@@ -265,7 +269,16 @@ export default function BookShipmentPage() {
         });
         setFieldValues(initial);
       })
-      .catch(() => setNotFound(true));
+      .catch((error) => {
+        if (error.response?.status === 404) {
+          setNotFound(true);
+          return;
+        }
+        setLoadError(
+          error.response?.data?.error ||
+          "Could not load this service. Please try again shortly."
+        );
+      });
   }, [slug, requestedTierId]);
 
   useEffect(() => {
@@ -296,7 +309,21 @@ export default function BookShipmentPage() {
   }
 
   if (!service) {
-    return <div className="max-w-2xl mx-auto px-4 py-16 text-gray-400">Loading…</div>;
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-16 text-center">
+        {loadError ? (
+          <>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">Service temporarily unavailable</h1>
+            <p role="alert" className="text-sm text-red-600">{loadError}</p>
+            <Link to="/services" className="inline-block mt-4 text-brand-600 hover:underline">
+              Back to services
+            </Link>
+          </>
+        ) : (
+          <p className="text-gray-400">Loading…</p>
+        )}
+      </div>
+    );
   }
 
   const tiers = service.pricing_tiers || [];

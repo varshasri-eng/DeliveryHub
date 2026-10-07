@@ -9,12 +9,14 @@ export default function ServiceDetailPage() {
   const navigate = useNavigate();
   const [service, setService] = useState(null);
   const [notFound, setNotFound] = useState(false);
+  const [loadError, setLoadError] = useState("");
   const [tierId, setTierId] = useState(null);
   const [quantity, setQuantity] = useState(1);
 
   useEffect(() => {
     setService(null);
     setNotFound(false);
+    setLoadError("");
     getService(slug)
       .then((res) => {
         const svc = res.data.service;
@@ -22,7 +24,16 @@ export default function ServiceDetailPage() {
         setTierId(svc.pricing_tiers?.[0]?.id ?? null);
         setQuantity(1);
       })
-      .catch(() => setNotFound(true));
+      .catch((error) => {
+        if (error.response?.status === 404) {
+          setNotFound(true);
+          return;
+        }
+        setLoadError(
+          error.response?.data?.error ||
+          "Could not load this service. Please try again shortly."
+        );
+      });
   }, [slug]);
 
   if (notFound) {
@@ -35,7 +46,21 @@ export default function ServiceDetailPage() {
   }
 
   if (!service) {
-    return <div className="max-w-5xl mx-auto px-4 py-16 text-gray-400">Loading…</div>;
+    return (
+      <div className="max-w-3xl mx-auto px-4 py-16 text-center">
+        {loadError ? (
+          <>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">Service temporarily unavailable</h1>
+            <p role="alert" className="text-sm text-red-600">{loadError}</p>
+            <Link to="/services" className="inline-block mt-4 text-brand-600 hover:underline">
+              Back to services
+            </Link>
+          </>
+        ) : (
+          <p className="text-gray-400">Loading…</p>
+        )}
+      </div>
+    );
   }
 
   const tiers = service.pricing_tiers || [];
