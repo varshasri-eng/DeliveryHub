@@ -140,8 +140,27 @@ def _validate_booking(data):
     # ── service-specific fields — every configured field is required ──
     submitted_values = data.get("field_values") or {}
     field_values = {}
-    for field in service.fields:
+    is_document_service = service.slug in {"document-services", "document-shipping"}
+    if is_document_service:
+        booking_fields = [
+            field for field in service.fields
+            if field.field_type == "date"
+        ]
+        if not booking_fields:
+            booking_date = submitted_values.get("booking_date")
+            if booking_date is None or (
+                isinstance(booking_date, str) and not booking_date.strip()
+            ):
+                return None, None, None, None, None, None, None, (
+                    jsonify({"error": "'Date of Booking' is required."}), 400
+                )
+            field_values["booking_date"] = booking_date
+    else:
+        booking_fields = service.fields
+
+    for field in booking_fields:
         value = submitted_values.get(field.field_key)
+        field_label = "Date of Booking" if is_document_service else field.label
 
         if field.field_type == "file":
             continue
@@ -151,14 +170,14 @@ def _validate_booking(data):
             # valid answer — presence, not truthiness, is what's required.
             if field.field_key not in submitted_values:
                 return None, None, None, None, None, None, None, (
-                    jsonify({"error": f"'{field.label}' is required."}), 400
+                    jsonify({"error": f"'{field_label}' is required."}), 400
                 )
             field_values[field.field_key] = bool(value)
             continue
 
         if value is None or (isinstance(value, str) and not value.strip()):
             return None, None, None, None, None, None, None, (
-                jsonify({"error": f"'{field.label}' is required."}), 400
+                jsonify({"error": f"'{field_label}' is required."}), 400
             )
 
         if field.field_type == "number":

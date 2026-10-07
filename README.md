@@ -69,7 +69,9 @@ selected sub-service on new shipment bookings. Migration
 and admin-note questions from Document Services. Migration
 `006_remove_document_service_booking_fields.sql` removes all remaining dynamic
 booking questions from Document Services except the configured date field,
-which it relabels as Date of Booking.
+which it relabels as Date of Booking. The booking API also ignores legacy
+non-date Document Services questions so existing database rows do not block
+bookings before that migration is applied.
 
 ## Project structure
 
