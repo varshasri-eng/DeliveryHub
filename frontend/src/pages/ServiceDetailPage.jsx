@@ -2,8 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, useNavigate, Link } from "react-router-dom";
 import { FiMinus, FiPlus, FiArrowLeft, FiArrowRight } from "react-icons/fi";
 import { getService } from "../api/services";
-
-const money = (n) => `$${Number(n).toFixed(2).replace(/\.00$/, "")}`;
+import { formatMoney } from "../utils/money";
 
 export default function ServiceDetailPage() {
   const { slug } = useParams();
@@ -116,35 +115,56 @@ export default function ServiceDetailPage() {
           ) : (
             <div className="space-y-3">
               {tiers.map((t) => (
-                <button
+                <div
                   key={t.id}
-                  type="button"
-                  onClick={() => setTierId(t.id)}
-                  className={`w-full flex items-center justify-between rounded-xl border-2 p-4
-                              text-left transition-colors
-                              ${t.id === tierId
-                                ? "border-brand-500 bg-brand-50"
-                                : "border-gray-200 bg-white hover:border-gray-300"}`}
+                  className={`rounded-xl border-2 transition-colors
+                    ${t.id === tierId ? "border-brand-500 bg-brand-50" : "border-gray-200 bg-white"}`}
                 >
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl">{t.icon || "📦"}</span>
-                    <div>
-                      <p className="font-semibold text-gray-900">{t.tier_name}</p>
-                      {t.description && (
-                        <p className="text-xs text-gray-500 mt-0.5">{t.description}</p>
-                      )}
-                      {t.duration_label && (
-                        <p className="text-xs text-gray-500 mt-0.5">{t.duration_label}</p>
-                      )}
+                  <button type="button" onClick={() => setTierId(t.id)}
+                    className="w-full flex items-center justify-between p-4 text-left">
+                    <div className="flex items-center gap-3">
+                      <span className="text-2xl">{t.icon || "📦"}</span>
+                      <div>
+                        <p className="font-semibold text-gray-900">{t.tier_name}</p>
+                        {t.description && (
+                          <p className="text-xs text-gray-500 mt-0.5">{t.description}</p>
+                        )}
+                        {t.duration_label && (
+                          <p className="text-xs text-gray-500 mt-0.5">{t.duration_label}</p>
+                        )}
+                      </div>
                     </div>
-                  </div>
-                  <span className="text-xl font-extrabold text-gray-900">{money(t.price)}</span>
-                </button>
+                    {t.sub_services?.length ? (
+                      <span className="text-xs font-semibold text-gray-500">Choose an option</span>
+                    ) : (
+                      <span className="text-right text-sm font-extrabold text-gray-900">
+                        <span className="block">{formatMoney(t.price, "USD")}</span>
+                        <span className="block">{formatMoney(t.price_inr, "INR")}</span>
+                      </span>
+                    )}
+                  </button>
+                  {t.id === tierId && t.sub_services?.length > 0 && (
+                    <div className="border-t border-gray-100 px-4 py-3">
+                      <p className="text-xs font-semibold text-gray-500 mb-2">Prices by delivery option</p>
+                      <div className="space-y-2">
+                        {t.sub_services.map((option) => (
+                          <div key={option.id} className="flex items-center justify-between gap-3 text-sm">
+                            <span className="text-gray-700">{option.name}</span>
+                            <span className="text-right text-xs font-semibold text-gray-900">
+                              <span className="block">{formatMoney(option.price, "USD")}</span>
+                              <span className="block">{formatMoney(option.price_inr, "INR")}</span>
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               ))}
             </div>
           )}
 
-          {service.enable_quantity && tier && (
+          {service.enable_quantity && tier && !tier.sub_services?.length && (
             <>
               <p className="text-xs font-bold uppercase tracking-wide text-gray-500 mt-6 mb-3">
                 Quantity
@@ -165,7 +185,13 @@ export default function ServiceDetailPage() {
 
               <div className="mt-4 bg-gray-900 text-white rounded-xl px-5 py-4 flex items-center justify-between">
                 <span className="text-sm">Total Amount:</span>
-                <span className="text-2xl font-extrabold">{money(total)}</span>
+                <span className="text-right">
+                  <span className="block text-2xl font-extrabold">{formatMoney(total, "USD")}</span>
+                  <span className="block text-sm font-semibold">{formatMoney(
+                    tier?.price_inr == null ? null : Number(tier.price_inr) * quantity,
+                    "INR",
+                  )}</span>
+                </span>
               </div>
             </>
           )}

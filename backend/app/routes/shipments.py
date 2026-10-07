@@ -88,6 +88,7 @@ def _validate_booking(data):
             jsonify({"error": "Selected pricing tier does not belong to this service."}), 400
         )
 
+    currency_code = "INR" if data.get("route_direction") == "IN_TO_US" else "USD"
     sub_service_id = data.get("sub_service_id")
     sub_service = None
     if tier.sub_services:
@@ -106,6 +107,17 @@ def _validate_booking(data):
     elif sub_service_id is not None:
         return None, None, None, None, None, None, None, (
             jsonify({"error": "Selected sub-service does not belong to this delivery option."}), 400
+        )
+
+    selected_price = (
+        sub_service.price_inr if currency_code == "INR" else sub_service.price
+    ) if sub_service else (
+        tier.price_inr if currency_code == "INR" else tier.price
+    )
+    if selected_price is None:
+        label = "INR" if currency_code == "INR" else "USD"
+        return None, None, None, None, None, None, None, (
+            jsonify({"error": f"{label} pricing is not set for this option yet. Please contact us."}), 400
         )
 
     # ── quantity ─────────────────────────────────────────────
@@ -184,8 +196,13 @@ def _validate_booking(data):
     return service, tier, sub_service, quantity, field_values, sender, receiver, None
 
 
-def _price_booking(tier, sub_service, quantity):
-    unit_price = float(sub_service.price if sub_service else tier.price)
+def _price_booking(tier, sub_service, quantity, currency_code):
+    price = (
+        sub_service.price_inr if currency_code == "INR" else sub_service.price
+    ) if sub_service else (
+        tier.price_inr if currency_code == "INR" else tier.price
+    )
+    unit_price = float(price)
     total_price = round(unit_price * quantity, 2)
     return unit_price, total_price
 
@@ -229,12 +246,14 @@ def create_shipment(customer):
     if err:
         return err
 
-    unit_price, total_price = _price_booking(tier, sub_service, quantity)
+    currency_code = "INR" if route_direction == "IN_TO_US" else "USD"
+    unit_price, total_price = _price_booking(tier, sub_service, quantity, currency_code)
 
     shipment = Shipment(
         shipment_number=generate_shipment_number(),
         customer_id=customer.id,
         route_direction=route_direction,
+        currency_code=currency_code,
         service_type_id=service.id,
         pricing_tier_id=tier.id,
         sub_service_id=sub_service.id if sub_service else None,
@@ -304,12 +323,14 @@ def create_guest_shipment():
             db.session.add(customer)
             db.session.flush()
 
-    unit_price, total_price = _price_booking(tier, sub_service, quantity)
+    currency_code = "INR" if route_direction == "IN_TO_US" else "USD"
+    unit_price, total_price = _price_booking(tier, sub_service, quantity, currency_code)
 
     shipment = Shipment(
         shipment_number=generate_shipment_number(),
         customer_id=customer.id if customer else None,
         route_direction=route_direction,
+        currency_code=currency_code,
         service_type_id=service.id,
         pricing_tier_id=tier.id,
         sub_service_id=sub_service.id if sub_service else None,

@@ -71,7 +71,10 @@ and admin-note questions from Document Services. Migration
 booking questions from Document Services except the configured date field,
 which it relabels as Date of Booking. The booking API also ignores legacy
 non-date Document Services questions so existing database rows do not block
-bookings before that migration is applied.
+bookings before that migration is applied. Migration
+`007_add_directional_pricing.sql` adds separate USD and INR prices for delivery
+tiers and sub-services, and snapshots the booking currency on shipments. INR
+prices remain unset until an admin configures them.
 
 ## Project structure
 

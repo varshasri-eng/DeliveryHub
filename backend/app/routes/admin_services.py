@@ -31,6 +31,7 @@ PUT    /api/admin/fields/<field_id>                - edit a field   [write]
 DELETE /api/admin/fields/<field_id>                - remove         [write]
 """
 
+import math
 import re
 from flask import Blueprint, request, jsonify
 from app import db
@@ -73,6 +74,19 @@ def _seed_default_subservices(tier):
         )
         for order, (name, price, icon) in enumerate(DEFAULT_SUBSERVICES)
     )
+
+
+def _parse_optional_price(data, field_name):
+    value = data.get(field_name)
+    if value is None or value == "":
+        return None, None
+    try:
+        price = float(value)
+    except (TypeError, ValueError):
+        return None, f"A valid {field_name.upper()} price is required."
+    if not math.isfinite(price) or price < 0:
+        return None, f"{field_name.upper()} price must be a non-negative amount."
+    return price, None
 
 
 # ── SERVICE TYPES ────────────────────────────────────────────
@@ -286,6 +300,11 @@ def add_pricing_tier(customer, service_id):
         price = float(data.get("price"))
     except (TypeError, ValueError):
         return jsonify({"error": "A valid price is required."}), 400
+    if not math.isfinite(price) or price < 0:
+        return jsonify({"error": "Price must be a non-negative amount."}), 400
+    price_inr, price_inr_error = _parse_optional_price(data, "price_inr")
+    if price_inr_error:
+        return jsonify({"error": price_inr_error}), 400
 
     tier = ServicePricingTier(
         service_type_id=service.id,
@@ -293,6 +312,7 @@ def add_pricing_tier(customer, service_id):
         description=(data.get("description") or "").strip() or None,
         duration_label=(data.get("duration_label") or "").strip() or None,
         price=price,
+        price_inr=price_inr,
         icon=(data.get("icon") or "").strip() or None,
         display_order=int(data.get("display_order") or 0),
     )
@@ -320,6 +340,13 @@ def update_pricing_tier(customer, tier_id):
             tier.price = float(data["price"])
         except (TypeError, ValueError):
             return jsonify({"error": "A valid price is required."}), 400
+        if not math.isfinite(tier.price) or tier.price < 0:
+            return jsonify({"error": "Price must be a non-negative amount."}), 400
+    if "price_inr" in data:
+        price_inr, price_inr_error = _parse_optional_price(data, "price_inr")
+        if price_inr_error:
+            return jsonify({"error": price_inr_error}), 400
+        tier.price_inr = price_inr
     if "icon" in data:
         tier.icon = (data["icon"] or "").strip() or None
     if "display_order" in data:
@@ -355,8 +382,11 @@ def add_sub_service(customer, tier_id):
         price = float(data.get("price"))
     except (TypeError, ValueError):
         return jsonify({"error": "A valid sub-service price is required."}), 400
-    if price < 0:
-        return jsonify({"error": "Sub-service price cannot be negative."}), 400
+    if not math.isfinite(price) or price < 0:
+        return jsonify({"error": "Sub-service price must be a non-negative amount."}), 400
+    price_inr, price_inr_error = _parse_optional_price(data, "price_inr")
+    if price_inr_error:
+        return jsonify({"error": price_inr_error}), 400
     if any(item.name.casefold() == name.casefold() for item in tier.sub_services):
         return jsonify({"error": "A sub-service with this name already exists for this tier."}), 409
 
@@ -364,6 +394,7 @@ def add_sub_service(customer, tier_id):
         pricing_tier=tier,
         name=name,
         price=price,
+        price_inr=price_inr,
         icon=(data.get("icon") or "").strip() or None,
         display_order=int(data.get("display_order") or len(tier.sub_services)),
     )
@@ -397,9 +428,14 @@ def update_sub_service(customer, sub_service_id):
             price = float(data["price"])
         except (TypeError, ValueError):
             return jsonify({"error": "A valid sub-service price is required."}), 400
-        if price < 0:
-            return jsonify({"error": "Sub-service price cannot be negative."}), 400
+        if not math.isfinite(price) or price < 0:
+            return jsonify({"error": "Sub-service price must be a non-negative amount."}), 400
         sub_service.price = price
+    if "price_inr" in data:
+        price_inr, price_inr_error = _parse_optional_price(data, "price_inr")
+        if price_inr_error:
+            return jsonify({"error": price_inr_error}), 400
+        sub_service.price_inr = price_inr
     if "icon" in data:
         sub_service.icon = (data["icon"] or "").strip() or None
     if "display_order" in data:

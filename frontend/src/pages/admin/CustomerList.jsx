@@ -18,12 +18,10 @@ const SEARCH_BY_OPTIONS = [
   { value: "phone",      label: "Phone / WhatsApp" },
   { value: "email",      label: "Email" },
   { value: "address",    label: "Address" },
-  { value: "dietary",    label: "Diet Group" },
   { value: "group",      label: "Family Group ID" },
   { value: "last_order", label: "Order Number / Status" },
 ];
 
-const DIET_OPTS  = ["veg", "nonveg", "both"];
 const LANGUAGES  = ["english", "telugu", "hindi", "tamil"];
 
 export default function CustomerList() {
@@ -44,7 +42,6 @@ export default function CustomerList() {
   const [filterRole, setFilterRole]         = useState("");
   const [filterStatus, setFilterStatus]     = useState("");
   const [filterLanguage, setFilterLanguage] = useState("");
-  const [filterDietary, setFilterDietary]   = useState("");
   const [page, setPage]                     = useState(1);
 
   // sort
@@ -71,7 +68,6 @@ export default function CustomerList() {
     if (filterRole)     params.role      = filterRole;
     if (filterStatus)   params.is_active = filterStatus;
     if (filterLanguage) params.language  = filterLanguage;
-    if (filterDietary)  params.dietary   = filterDietary;
 
     params.sort_by    = sortBy;
     params.sort_order = sortOrder;
@@ -83,7 +79,7 @@ export default function CustomerList() {
       })
       .catch(() => toast.error("Failed to load customers."))
       .finally(() => setLoading(false));
-  }, [searchBy, searchQ, filterRole, filterStatus, filterLanguage, filterDietary, page, sortBy, sortOrder]);
+  }, [searchBy, searchQ, filterRole, filterStatus, filterLanguage, page, sortBy, sortOrder]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -92,7 +88,7 @@ export default function CustomerList() {
 
   const clearSearch = () => { setSearchQ(""); resetPage(); };
 
-  const activeFilterCount = [filterRole, filterStatus, filterLanguage, filterDietary]
+  const activeFilterCount = [filterRole, filterStatus, filterLanguage]
     .filter(Boolean).length;
 
   // ── toggle active ────────────────────────────────────────
@@ -196,36 +192,22 @@ export default function CustomerList() {
             )}
           </div>
 
-          {/* Search input — diet gets a select, group gets number, rest get text */}
+          {/* Search input */}
           <div className="relative flex-1">
-            {searchBy === "dietary" ? (
-              <select
-                className="input text-sm h-9 py-0"
-                value={searchQ}
-                onChange={(e) => { setSearchQ(e.target.value); resetPage(); }}>
-                <option value="">All diets</option>
-                {DIET_OPTS.map((d) => (
-                  <option key={d} value={d}>{d.charAt(0).toUpperCase() + d.slice(1)}</option>
-                ))}
-              </select>
-            ) : (
-              <>
-                <FiSearch className="absolute left-3 top-2.5 text-gray-400" size={14} />
-                <input
-                  className="input pl-8 pr-8 text-sm h-9 py-0"
-                  placeholder={`Search by ${selectedLabel.toLowerCase()}…`}
-                  value={searchQ}
-                  onChange={(e) => { setSearchQ(e.target.value); resetPage(); }}
-                  type={searchBy === "group" ? "number" : "text"}
-                />
-                {searchQ && (
-                  <button
-                    onClick={clearSearch}
-                    className="absolute right-2.5 top-2.5 text-gray-400 hover:text-gray-600">
-                    <FiX size={14} />
-                  </button>
-                )}
-              </>
+            <FiSearch className="absolute left-3 top-2.5 text-gray-400" size={14} />
+            <input
+              className="input pl-8 pr-8 text-sm h-9 py-0"
+              placeholder={`Search by ${selectedLabel.toLowerCase()}…`}
+              value={searchQ}
+              onChange={(e) => { setSearchQ(e.target.value); resetPage(); }}
+              type={searchBy === "group" ? "number" : "text"}
+            />
+            {searchQ && (
+              <button
+                onClick={clearSearch}
+                className="absolute right-2.5 top-2.5 text-gray-400 hover:text-gray-600">
+                <FiX size={14} />
+              </button>
             )}
           </div>
         </div>
@@ -279,21 +261,11 @@ export default function CustomerList() {
             ))}
           </select>
 
-          <select
-            className="input text-sm w-36 h-8 py-0"
-            value={filterDietary}
-            onChange={(e) => { setFilterDietary(e.target.value); resetPage(); }}>
-            <option value="">All Diets</option>
-            {DIET_OPTS.map((d) => (
-              <option key={d} value={d}>{d.charAt(0).toUpperCase() + d.slice(1)}</option>
-            ))}
-          </select>
-
           {activeFilterCount > 0 && (
             <button
               onClick={() => {
                 setFilterRole(""); setFilterStatus("");
-                setFilterLanguage(""); setFilterDietary(""); resetPage();
+                setFilterLanguage(""); resetPage();
               }}
               className="text-xs text-red-500 hover:text-red-700 font-medium
                          flex items-center gap-1 ml-auto">
@@ -351,7 +323,7 @@ export default function CustomerList() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-100 bg-gray-50">
-                {["Name", "Contact", "Diet", "Language", "Role", "Status", "Joined", ""].map((h) => (
+                {["Name", "Contact", "Language", "Role", "Status", "Joined", ""].map((h) => (
                   <th key={h} className="text-left text-xs font-semibold text-gray-500
                                          uppercase tracking-wide px-4 py-3">
                     {h}
@@ -362,7 +334,7 @@ export default function CustomerList() {
             <tbody className="divide-y divide-gray-50">
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="text-center py-12">
+                  <td colSpan={7} className="text-center py-12">
                     <div className="flex items-center justify-center gap-2 text-gray-400">
                       <svg className="animate-spin h-4 w-4" viewBox="0 0 24 24" fill="none">
                         <circle className="opacity-25" cx="12" cy="12" r="10"
@@ -376,7 +348,7 @@ export default function CustomerList() {
                 </tr>
               ) : customers.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="text-center py-14">
+                  <td colSpan={7} className="text-center py-14">
                     <FiUsers className="mx-auto text-gray-300 text-3xl mb-2" />
                     <p className="text-gray-400 font-medium">No customers found</p>
                     {(searchQ || activeFilterCount > 0) && (
@@ -399,11 +371,6 @@ export default function CustomerList() {
                   <td className="px-4 py-3">
                     <p className="text-gray-700 text-xs">{c.email || "—"}</p>
                     <p className="text-xs text-gray-400">{c.phone}</p>
-                  </td>
-
-                  {/* Diet */}
-                  <td className="px-4 py-3">
-                    <DietBadge value={c.dietary_preference} />
                   </td>
 
                   {/* Language */}
@@ -488,19 +455,5 @@ export default function CustomerList() {
         )}
       </div>
     </div>
-  );
-}
-
-function DietBadge({ value }) {
-  const map = {
-    veg:    { bg: "bg-green-100 text-green-700", label: "Veg" },
-    nonveg: { bg: "bg-red-100 text-red-700",     label: "Non-veg" },
-    both:   { bg: "bg-orange-100 text-orange-700", label: "Both" },
-  };
-  const style = map[value] ?? { bg: "bg-gray-100 text-gray-500", label: value ?? "—" };
-  return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${style.bg}`}>
-      {style.label}
-    </span>
   );
 }

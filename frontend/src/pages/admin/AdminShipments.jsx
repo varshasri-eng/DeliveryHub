@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
+import { formatMoney } from "../../utils/money";
 import { FiPackage, FiX } from "react-icons/fi";
 import {
   getAdminShipments, updateShipmentStatus,
@@ -141,7 +142,9 @@ export default function AdminShipments() {
                   </p>
                 </div>
                 <div className="text-right flex-shrink-0">
-                  <p className="font-bold text-gray-900">${Number(s.total_price).toFixed(2)}</p>
+                  <p className="font-bold text-gray-900">
+                    {formatMoney(s.total_price, s.currency_code)}
+                  </p>
                   <select
                     value={s.status}
                     onChange={(e) => handleStatusChange(s, e.target.value)}
@@ -210,7 +213,7 @@ function ShipmentDetailModal({ shipment, onClose }) {
               {shipment.sub_service_name ? ` — ${shipment.sub_service_name}` : ""}
             </p>
             <p className="text-gray-500 mt-0.5">
-              Qty {shipment.quantity} · ${Number(shipment.total_price).toFixed(2)}
+              Qty {shipment.quantity} · {formatMoney(shipment.total_price, shipment.currency_code)}
             </p>
           </div>
           <div className="grid grid-cols-2 gap-4">

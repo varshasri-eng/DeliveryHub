@@ -86,6 +86,7 @@ class ServicePricingTier(db.Model):
     description = db.Column(db.String(255))
     duration_label = db.Column(db.String(100))
     price = db.Column(db.Numeric(10, 2), nullable=False)
+    price_inr = db.Column(db.Numeric(10, 2))
     icon = db.Column(db.String(20))
     display_order = db.Column(db.Integer, default=0)
 
@@ -100,6 +101,7 @@ class ServicePricingTier(db.Model):
             "description": self.description,
             "duration_label": self.duration_label,
             "price": float(self.price),
+            "price_inr": float(self.price_inr) if self.price_inr is not None else None,
             "icon": self.icon,
             "display_order": self.display_order,
             "sub_services": [sub_service.to_dict() for sub_service in self.sub_services],
@@ -117,6 +119,7 @@ class ServiceSubservice(db.Model):
     )
     name = db.Column(db.String(255), nullable=False)
     price = db.Column(db.Numeric(10, 2), nullable=False)
+    price_inr = db.Column(db.Numeric(10, 2))
     icon = db.Column(db.String(20))
     display_order = db.Column(db.Integer, default=0)
 
@@ -125,6 +128,7 @@ class ServiceSubservice(db.Model):
             "id": self.id,
             "name": self.name,
             "price": float(self.price),
+            "price_inr": float(self.price_inr) if self.price_inr is not None else None,
             "icon": self.icon,
             "display_order": self.display_order,
         }

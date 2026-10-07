@@ -9,6 +9,7 @@ import {
   addPricingSubservice, updatePricingSubservice, deletePricingSubservice,
   addField, updateField, deleteField,
 } from "../../api/admin";
+import { formatMoney } from "../../utils/money";
 
 const FIELD_TYPES = ["text", "textarea", "number", "select", "checkbox", "date", "file"];
 
@@ -67,7 +68,7 @@ function BulletListEditor({ title, items, onAdd, onUpdate, onDelete }) {
 
 /* ── Pricing tiers editor ── */
 function SubservicesEditor({ tier, onAdd, onUpdate, onDelete }) {
-  const empty = { name: "", price: "", icon: "" };
+  const empty = { name: "", price: "", price_inr: "", icon: "" };
   const [draft, setDraft] = useState(empty);
   const [editingId, setEditingId] = useState(null);
   const [editDraft, setEditDraft] = useState(empty);
@@ -78,7 +79,12 @@ function SubservicesEditor({ tier, onAdd, onUpdate, onDelete }) {
       toast.error("Sub-service name and price are required.");
       return;
     }
-    await onAdd(tier.id, { ...draft, price: Number(draft.price), display_order: subservices.length });
+    await onAdd(tier.id, {
+      ...draft,
+      price: Number(draft.price),
+      price_inr: draft.price_inr === "" ? null : Number(draft.price_inr),
+      display_order: subservices.length,
+    });
     setDraft(empty);
   };
 
@@ -87,6 +93,9 @@ function SubservicesEditor({ tier, onAdd, onUpdate, onDelete }) {
       <p className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">
         Sub-services for {tier.tier_name}
       </p>
+      <p className="text-xs text-gray-400 mb-2">
+        US → India prices are in USD; India → US prices are in INR.
+      </p>
       <div className="space-y-2 mb-3">
         {subservices.map((subservice) => (
           <div key={subservice.id} className="flex items-center gap-2">
@@ -94,15 +103,19 @@ function SubservicesEditor({ tier, onAdd, onUpdate, onDelete }) {
               <>
                 <input className="input flex-1" placeholder="Name" value={editDraft.name}
                   onChange={(e) => setEditDraft({ ...editDraft, name: e.target.value })} />
-                <input className="input w-24" type="number" min="0" step="0.01" placeholder="Price"
+                <input className="input w-24" type="number" min="0" step="0.01" placeholder="US → India (USD)"
                   value={editDraft.price}
                   onChange={(e) => setEditDraft({ ...editDraft, price: e.target.value })} />
+                <input className="input w-24" type="number" min="0" step="0.01" placeholder="India → US (INR)"
+                  value={editDraft.price_inr}
+                  onChange={(e) => setEditDraft({ ...editDraft, price_inr: e.target.value })} />
                 <input className="input w-20" placeholder="Icon" value={editDraft.icon}
                   onChange={(e) => setEditDraft({ ...editDraft, icon: e.target.value })} />
                 <button type="button" onClick={async () => {
                   await onUpdate(subservice.id, {
                     ...editDraft,
                     price: Number(editDraft.price),
+                    price_inr: editDraft.price_inr === "" ? null : Number(editDraft.price_inr),
                   });
                   setEditingId(null);
                 }} className="text-xs font-semibold text-brand-600">Save</button>
@@ -113,12 +126,15 @@ function SubservicesEditor({ tier, onAdd, onUpdate, onDelete }) {
               <>
                 <span className="text-lg">{subservice.icon || "📦"}</span>
                 <span className="flex-1 text-sm text-gray-800">{subservice.name}</span>
-                <span className="text-sm font-bold text-gray-900">${Number(subservice.price).toFixed(2)}</span>
+                <span className="text-sm font-bold text-gray-900">
+                  {formatMoney(subservice.price, "USD")} / {formatMoney(subservice.price_inr, "INR")}
+                </span>
                 <button type="button" onClick={() => {
                   setEditingId(subservice.id);
                   setEditDraft({
                     name: subservice.name,
                     price: subservice.price,
+                    price_inr: subservice.price_inr ?? "",
                     icon: subservice.icon || "",
                   });
                 }} className="text-gray-400 hover:text-gray-700"><FiEdit2 size={14} /></button>
@@ -132,11 +148,13 @@ function SubservicesEditor({ tier, onAdd, onUpdate, onDelete }) {
           <p className="text-sm text-gray-400">No sub-services added.</p>
         )}
       </div>
-      <div className="grid grid-cols-[1fr_100px_80px_auto] gap-2">
+      <div className="grid grid-cols-[1fr_100px_100px_80px_auto] gap-2">
         <input className="input" placeholder="Sub-service name" value={draft.name}
           onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
-        <input className="input" type="number" min="0" step="0.01" placeholder="Price"
+        <input className="input" type="number" min="0" step="0.01" placeholder="US → India (USD) *"
           value={draft.price} onChange={(e) => setDraft({ ...draft, price: e.target.value })} />
+        <input className="input" type="number" min="0" step="0.01" placeholder="India → US (INR)"
+          value={draft.price_inr} onChange={(e) => setDraft({ ...draft, price_inr: e.target.value })} />
         <input className="input" placeholder="Icon" value={draft.icon}
           onChange={(e) => setDraft({ ...draft, icon: e.target.value })} />
         <button type="button" onClick={submitAdd}
@@ -150,7 +168,7 @@ function TiersEditor({
   tiers, onAdd, onUpdate, onDelete,
   onAddSubservice, onUpdateSubservice, onDeleteSubservice,
 }) {
-  const empty = { tier_name: "", description: "", duration_label: "", price: "", icon: "" };
+  const empty = { tier_name: "", description: "", duration_label: "", price: "", price_inr: "", icon: "" };
   const [draft, setDraft] = useState(empty);
   const [editingId, setEditingId] = useState(null);
   const [editDraft, setEditDraft] = useState(empty);
@@ -160,13 +178,20 @@ function TiersEditor({
       toast.error("Tier name and price are required.");
       return;
     }
-    await onAdd({ ...draft, price: Number(draft.price) });
+    await onAdd({
+      ...draft,
+      price: Number(draft.price),
+      price_inr: draft.price_inr === "" ? null : Number(draft.price_inr),
+    });
     setDraft(empty);
   };
 
   return (
     <div className="card">
       <h3 className="font-semibold text-gray-900 mb-3">Delivery Options</h3>
+      <p className="text-xs text-gray-400 mb-3">
+        Set separate prices for US → India (USD) and India → US (INR).
+      </p>
       <div className="space-y-2 mb-4">
         {tiers.map((t) => (
           <div key={t.id} className="border border-gray-100 rounded-lg p-3">
@@ -180,11 +205,17 @@ function TiersEditor({
                   onChange={(e) => setEditDraft({ ...editDraft, description: e.target.value })} />
                 <input className="input" placeholder="Duration label" value={editDraft.duration_label}
                   onChange={(e) => setEditDraft({ ...editDraft, duration_label: e.target.value })} />
-                <input className="input" type="number" placeholder="Price" value={editDraft.price}
+                <input className="input" type="number" min="0" step="0.01" placeholder="US → India (USD)" value={editDraft.price}
                   onChange={(e) => setEditDraft({ ...editDraft, price: e.target.value })} />
+                <input className="input" type="number" min="0" step="0.01" placeholder="India → US (INR)" value={editDraft.price_inr}
+                  onChange={(e) => setEditDraft({ ...editDraft, price_inr: e.target.value })} />
                 <div className="col-span-2 flex gap-3">
                   <button type="button" onClick={async () => {
-                    await onUpdate(t.id, { ...editDraft, price: Number(editDraft.price) });
+                    await onUpdate(t.id, {
+                      ...editDraft,
+                      price: Number(editDraft.price),
+                      price_inr: editDraft.price_inr === "" ? null : Number(editDraft.price_inr),
+                    });
                     setEditingId(null);
                   }} className="text-xs font-semibold text-brand-600">Save</button>
                   <button type="button" onClick={() => setEditingId(null)} className="text-xs text-gray-400">Cancel</button>
@@ -201,8 +232,10 @@ function TiersEditor({
                   </div>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="font-bold text-gray-900">${Number(t.price).toFixed(2)}</span>
-                  <button type="button" onClick={() => { setEditingId(t.id); setEditDraft({ tier_name: t.tier_name, description: t.description || "", duration_label: t.duration_label || "", price: t.price, icon: t.icon || "" }); }}
+                  <span className="font-bold text-gray-900">
+                    {formatMoney(t.price, "USD")} / {formatMoney(t.price_inr, "INR")}
+                  </span>
+                  <button type="button" onClick={() => { setEditingId(t.id); setEditDraft({ tier_name: t.tier_name, description: t.description || "", duration_label: t.duration_label || "", price: t.price, price_inr: t.price_inr ?? "", icon: t.icon || "" }); }}
                     className="text-gray-400 hover:text-gray-700"><FiEdit2 size={14} /></button>
                   <button type="button" onClick={() => onDelete(t.id)}
                     className="text-gray-400 hover:text-red-600"><FiTrash2 size={14} /></button>
@@ -227,8 +260,10 @@ function TiersEditor({
           onChange={(e) => setDraft({ ...draft, description: e.target.value })} />
         <input className="input" placeholder="Duration label (e.g. 3-5 Business Days)" value={draft.duration_label}
           onChange={(e) => setDraft({ ...draft, duration_label: e.target.value })} />
-        <input className="input" type="number" placeholder="Price *" value={draft.price}
+        <input className="input" type="number" min="0" step="0.01" placeholder="US → India (USD) *" value={draft.price}
           onChange={(e) => setDraft({ ...draft, price: e.target.value })} />
+        <input className="input" type="number" min="0" step="0.01" placeholder="India → US (INR, optional)" value={draft.price_inr}
+          onChange={(e) => setDraft({ ...draft, price_inr: e.target.value })} />
       </div>
       <button type="button" onClick={submitAdd}
         className="mt-2 px-4 py-2 rounded-lg bg-brand-500 text-white text-sm font-semibold hover:bg-brand-600">

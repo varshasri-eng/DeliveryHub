@@ -1,22 +1,26 @@
 import { useState, useEffect } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
 import toast from "react-hot-toast";
-import { FiCheckCircle, FiCheck, FiArrowUp, FiMessageCircle, FiMessageSquare } from "react-icons/fi";
+import { FiCheckCircle, FiCheck, FiArrowUp, FiMessageCircle, FiMessageSquare, FiDownload } from "react-icons/fi";
 import { getService } from "../api/services";
 import { createShipment, createGuestShipment } from "../api/shipments";
 import { useAuth } from "../context/AuthContext";
+import { formatMoney } from "../utils/money";
+import { downloadShipmentSummary } from "../utils/shipmentSummary";
 
-const money = (n) => `$${Number(n).toFixed(2).replace(/\.00$/, "")}`;
+const money = (n, currencyCode) => formatMoney(n, currencyCode);
 const WHATSAPP_NUMBER = "15107146946";
 
 const DIRECTIONS = {
   US_TO_IN: {
     label: "United States → India",
+    currencyCode: "USD",
     from: { name: "United States", shortName: "USA", phoneCode: "1", postalLabel: "ZIP Code", postalPlaceholder: "94105", postalPattern: /^\d{5}(?:-\d{4})?$/ },
     to: { name: "India", shortName: "India", phoneCode: "91", postalLabel: "Postal Code", postalPlaceholder: "500072", postalPattern: /^\d{6}$/ },
   },
   IN_TO_US: {
     label: "India → United States",
+    currencyCode: "INR",
     from: { name: "India", shortName: "India", phoneCode: "91", postalLabel: "Postal Code", postalPlaceholder: "500072", postalPattern: /^\d{6}$/ },
     to: { name: "United States", shortName: "USA", phoneCode: "1", postalLabel: "ZIP Code", postalPlaceholder: "94105", postalPattern: /^\d{5}(?:-\d{4})?$/ },
   },
@@ -312,7 +316,12 @@ export default function BookShipmentPage() {
   }
 
   const effectiveQty = service.enable_quantity ? quantity : 1;
-  const unitPrice = subservice ? Number(subservice.price) : Number(tier?.price || 0);
+  const currencyCode = route.currencyCode;
+  const priceKey = currencyCode === "INR" ? "price_inr" : "price";
+  const selectedPrice = subservices.length > 0
+    ? subservice?.[priceKey]
+    : tier?.[priceKey];
+  const unitPrice = selectedPrice == null ? 0 : Number(selectedPrice);
   const total = unitPrice * effectiveQty;
   const isDocumentService = ["document-services", "document-shipping"].includes(service.slug);
   const fields = isDocumentService ? [] : service.fields || [];
@@ -333,7 +342,7 @@ export default function BookShipmentPage() {
   const emailError = !customer && !isDocumentService && !/^\S+@\S+\.\S+$/.test(guestEmail.trim())
     ? "Enter a valid email."
     : "";
-  const hasErrors = !tier || (subservices.length > 0 && !subservice) ||
+  const hasErrors = !tier || (subservices.length > 0 && !subservice) || selectedPrice == null ||
     Object.keys(senderErrors).length || Object.keys(receiverErrors).length ||
     Object.keys(fieldErrors).length || emailError;
 
@@ -380,7 +389,9 @@ export default function BookShipmentPage() {
             guest_email: guestEmail.trim(),
             guest_phone: payload.sender_phone,
           });
-      setBooked(res.data.shipment);
+      const shipment = res.data.shipment;
+      setBooked(shipment);
+      downloadShipmentSummary(shipment);
       window.scrollTo({ top: 0 });
     } catch (err) {
       toast.error(err.response?.data?.error || "Could not book your shipment.");
@@ -391,19 +402,42 @@ export default function BookShipmentPage() {
 
   if (booked) {
     return (
-      <div className="max-w-lg mx-auto px-4 py-16 text-center">
+      <div className="max-w-2xl mx-auto px-4 py-12">
+        <div className="card">
+        <div className="text-center">
         <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-green-50 text-green-600 mb-4">
           <FiCheckCircle size={28} />
         </div>
         <h1 className="text-2xl font-bold text-gray-900 mb-2">Shipment requested</h1>
-        <p className="text-gray-600">
-          Your shipment number is <span className="font-bold text-gray-900">{booked.shipment_number}</span>.
-          Keep it handy — you'll need it to track your shipment.
-        </p>
+        <p className="text-gray-600">Your booking details have been downloaded. Keep the file to recall your tracking number.</p>
+        <p className="mt-3 text-xs font-bold uppercase tracking-wide text-gray-400">Tracking number</p>
+        <p className="mt-1 text-2xl font-extrabold text-brand-700">{booked.shipment_number}</p>
+        </div>
+        <div className="mt-6 grid sm:grid-cols-2 gap-4 border-t border-gray-100 pt-5 text-sm">
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-1">Order summary</p>
+            <p className="font-semibold text-gray-900">{booked.service_name} — {booked.tier_name}</p>
+            {booked.sub_service_name && <p className="text-gray-600">{booked.sub_service_name}</p>}
+            <p className="mt-1 text-gray-600">{money(booked.total_price, booked.currency_code)}</p>
+            <p className="mt-1 text-gray-500">Booked {new Date(booked.created_at).toLocaleString()}</p>
+          </div>
+          <div>
+            <p className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-1">Shipment route</p>
+            <p className="font-semibold text-gray-900">From: {booked.sender_name}</p>
+            <p className="text-gray-600">{booked.sender_address}</p>
+            <p className="mt-2 font-semibold text-gray-900">To: {booked.receiver_name}</p>
+            <p className="text-gray-600">{booked.receiver_address}</p>
+          </div>
+        </div>
         <div className="mt-6 flex flex-col gap-2">
+          <button type="button" onClick={() => downloadShipmentSummary(booked)}
+            className="btn-primary flex items-center justify-center gap-2">
+            <FiDownload size={16} /> Download booking details
+          </button>
           {customer && <Link to="/account/shipments" className="btn-primary text-center">View My Shipments</Link>}
           <Link to="/track" className="btn-secondary text-center">Track this shipment</Link>
           <Link to="/services" className="btn-secondary text-center">Book another shipment</Link>
+        </div>
         </div>
       </div>
     );
@@ -473,7 +507,9 @@ export default function BookShipmentPage() {
                         : "border-gray-200 hover:border-gray-300"}`}>
                     <span>{option.icon || "📦"}</span>
                     <span className="flex-1 text-xs font-semibold text-gray-900">{option.name}</span>
-                    <span className="text-xs font-bold text-gray-900">{money(option.price)}</span>
+                    <span className="text-xs font-bold text-gray-900">
+                      {money(option[priceKey], currencyCode)}
+                    </span>
                   </button>
                 ))}
               </div>
@@ -525,10 +561,12 @@ export default function BookShipmentPage() {
             )}
             <div className="flex justify-between">
               <span className="text-gray-400">Total</span>
-              <span className="text-gray-900 font-extrabold">{money(total)}</span>
+              <span className="text-gray-900 font-extrabold">
+                {selectedPrice == null ? `${currencyCode} price not set` : money(total, currencyCode)}
+              </span>
             </div>
           </div>
-          <button type="submit" disabled={submitting} className="btn-primary w-full">
+          <button type="submit" disabled={submitting || Boolean(hasErrors)} className="btn-primary w-full">
             {submitting ? "Submitting…" : "Review shipment"}
           </button>
           <p className="text-xs text-gray-400 text-center">No payment at this step</p>
@@ -558,7 +596,7 @@ export default function BookShipmentPage() {
                     <span className="text-xl">{option.icon || "📦"}</span>
                     <span className="mt-2 block font-bold text-gray-900">{option.name}</span>
                     <span className="mt-3 block font-extrabold text-gray-900">
-                      {money(option.price)}
+                      {money(option[priceKey], currencyCode)}
                     </span>
                   </button>
                 ))}

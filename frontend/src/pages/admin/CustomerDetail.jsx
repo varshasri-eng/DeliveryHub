@@ -6,6 +6,7 @@ import {
   getCustomerAddresses, getCustomerShipments,
 } from "../../api/admin";
 import toast from "react-hot-toast";
+import { formatMoney } from "../../utils/money";
 import {
   FiArrowLeft, FiEdit2, FiSave, FiX, FiUserX, FiUserCheck,
   FiUser, FiPhone, FiMail, FiMessageCircle,
@@ -13,7 +14,6 @@ import {
 } from "react-icons/fi";
 
 const LANGUAGES   = ["english", "telugu", "hindi", "tamil"];
-const DIET_OPTS   = ["veg", "nonveg", "both"];
 const ORDER_TYPES = ["delivery", "pickup"];
 
 export default function CustomerDetail() {
@@ -52,7 +52,6 @@ export default function CustomerDetail() {
         name: form.name, phone: form.phone,
         whatsapp_number: form.whatsapp_number, email: form.email,
         preferred_language: form.preferred_language,
-        dietary_preference: form.dietary_preference,
         default_order_type: form.default_order_type,
       });
       toast.success("Customer updated.");
@@ -194,20 +193,13 @@ export default function CustomerDetail() {
             <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-4">
               Preferences
             </h3>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <AdminField label="Language">
                 {editing
                   ? <select className="input" value={form.preferred_language} onChange={set("preferred_language")}>
                       {LANGUAGES.map((l) => <option key={l} value={l}>{l.charAt(0).toUpperCase()+l.slice(1)}</option>)}
                     </select>
                   : <span className="capitalize">{customer.preferred_language}</span>}
-              </AdminField>
-              <AdminField label="Dietary">
-                {editing
-                  ? <select className="input" value={form.dietary_preference} onChange={set("dietary_preference")}>
-                      {DIET_OPTS.map((d) => <option key={d} value={d}>{d.charAt(0).toUpperCase()+d.slice(1)}</option>)}
-                    </select>
-                  : <span className="capitalize">{customer.dietary_preference}</span>}
               </AdminField>
               <AdminField label="Order Type">
                 {editing
@@ -303,7 +295,9 @@ export default function CustomerDetail() {
                       </p>
                     </div>
                     <div className="text-right">
-                      <p className="font-semibold text-gray-900">${s.total_price}</p>
+                      <p className="font-semibold text-gray-900">
+                        {formatMoney(s.total_price, s.currency_code)}
+                      </p>
                       <span className={`text-xs font-medium px-2 py-0.5 rounded-full capitalize
                         ${s.status === "delivered"  ? "bg-green-100 text-green-700" :
                           s.status === "cancelled"  ? "bg-red-100 text-red-700" :

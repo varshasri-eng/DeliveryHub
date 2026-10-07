@@ -1,11 +1,14 @@
 import { useState, useEffect } from "react";
 import {
   FiPackage, FiClock, FiTruck, FiCheckCircle, FiXCircle, FiMapPin,
+  FiDownload,
 } from "react-icons/fi";
 import { getMyShipments, submitPaymentProof } from "../../api/shipments";
 import { getPaymentSettings } from "../../api/settings";
 import { useBranding } from "../../context/BrandingContext";
 import { resolveMediaUrl } from "../../utils/media";
+import { formatMoney } from "../../utils/money";
+import { downloadShipmentSummary } from "../../utils/shipmentSummary";
 import toast from "react-hot-toast";
 
 const STATUS_STYLE = {
@@ -28,6 +31,7 @@ export default function Shipments() {
   const [loading, setLoading] = useState(true);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [paymentSettings, setPaymentSettings] = useState(null);
+  const [expandedShipmentId, setExpandedShipmentId] = useState(null);
 
   useEffect(() => {
     getMyShipments()
@@ -104,7 +108,9 @@ export default function Shipments() {
                     </p>
                   </div>
                   <div className="text-right">
-                    <p className="font-bold text-gray-900">${Number(shipment.total_price).toFixed(2)}</p>
+                    <p className="font-bold text-gray-900">
+                      {formatMoney(shipment.total_price, shipment.currency_code)}
+                    </p>
                     <span className={`inline-flex items-center gap-1 mt-1 text-xs font-medium
                                      px-2.5 py-0.5 rounded-full border
                                      ${s.bg} ${s.text} ${s.border}`}>
@@ -119,7 +125,7 @@ export default function Shipments() {
                     <span className="text-gray-700">{shipment.tier_name}</span>
                     <span className="text-gray-600">
                       {shipment.quantity > 1 ? `× ${shipment.quantity} · ` : ""}
-                      ${Number(shipment.total_price).toFixed(2)}
+                      {formatMoney(shipment.total_price, shipment.currency_code)}
                     </span>
                   </div>
                   {shipment.sub_service_name && (
@@ -129,6 +135,41 @@ export default function Shipments() {
                     <FiMapPin size={11} /> {shipment.sender_name} → {shipment.receiver_name}
                   </p>
                 </div>
+
+                <div className="mt-3 flex gap-2">
+                  <button type="button"
+                    onClick={() => setExpandedShipmentId((current) =>
+                      current === shipment.id ? null : shipment.id
+                    )}
+                    className="text-xs font-semibold text-brand-700 hover:text-brand-900">
+                    {expandedShipmentId === shipment.id ? "Hide details" : "View details"}
+                  </button>
+                  <button type="button" onClick={() => downloadShipmentSummary(shipment)}
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-brand-700 hover:text-brand-900">
+                    <FiDownload size={12} /> Download details
+                  </button>
+                </div>
+
+                {expandedShipmentId === shipment.id && (
+                  <div className="mt-3 grid sm:grid-cols-2 gap-3 border-t border-gray-100 pt-3 text-sm">
+                    <div className="rounded-lg bg-gray-50 p-3">
+                      <p className="text-xs font-bold uppercase tracking-wide text-gray-400">From</p>
+                      <p className="mt-1 font-semibold text-gray-900">{shipment.sender_name}</p>
+                      <p className="text-gray-600">{shipment.sender_phone}</p>
+                      <p className="text-gray-600">{shipment.sender_address}</p>
+                    </div>
+                    <div className="rounded-lg bg-gray-50 p-3">
+                      <p className="text-xs font-bold uppercase tracking-wide text-gray-400">To</p>
+                      <p className="mt-1 font-semibold text-gray-900">{shipment.receiver_name}</p>
+                      <p className="text-gray-600">{shipment.receiver_phone}</p>
+                      <p className="text-gray-600">{shipment.receiver_address}</p>
+                    </div>
+                    <div className="sm:col-span-2 text-xs text-gray-500">
+                      Tracking number: <span className="font-bold text-gray-800">{shipment.shipment_number}</span>
+                      {" · "}Booked {new Date(shipment.created_at).toLocaleString()}
+                    </div>
+                  </div>
+                )}
 
                 {shipment.invoice && (
                   <div className="border-t border-gray-100 mt-3 pt-3">
@@ -146,7 +187,7 @@ export default function Shipments() {
                       </div>
                       <div className="flex items-center gap-3">
                         <p className="font-semibold text-gray-900">
-                          ${Number(shipment.invoice.total_amount).toFixed(2)}
+                          {formatMoney(shipment.invoice.total_amount, shipment.currency_code)}
                         </p>
                         <button
                           onClick={() => openInvoice(shipment)}
@@ -240,6 +281,7 @@ function InvoiceModal({ shipment, paymentSettings, onClose, onPrint, onPaymentSu
               invoice={invoice}
               paymentSettings={paymentSettings}
               total={total}
+              currencyCode={shipment.currency_code}
               canSubmitPayment={canSubmitPayment}
               screenshotFile={screenshotFile}
               setScreenshotFile={setScreenshotFile}
@@ -308,10 +350,10 @@ function InvoiceModal({ shipment, paymentSettings, onClose, onPrint, onPaymentSu
                   </td>
                   <td className="p-3 text-sm text-center border-b border-gray-100">{shipment.quantity}</td>
                   <td className="p-3 text-sm text-right border-b border-gray-100">
-                    ${Number(shipment.unit_price).toFixed(2)}
+                    {formatMoney(shipment.unit_price, shipment.currency_code)}
                   </td>
                   <td className="p-3 text-sm text-right font-semibold border-b border-gray-100">
-                    ${Number(shipment.total_price).toFixed(2)}
+                    {formatMoney(shipment.total_price, shipment.currency_code)}
                   </td>
                 </tr>
               </tbody>
@@ -322,7 +364,7 @@ function InvoiceModal({ shipment, paymentSettings, onClose, onPrint, onPaymentSu
             <div className="w-72">
               <div className="flex justify-between pt-3 mt-2 border-t-2 border-gray-200 font-extrabold text-lg">
                 <span>Total</span>
-                <span>${total.toFixed(2)}</span>
+                <span>{formatMoney(total, shipment.currency_code)}</span>
               </div>
             </div>
           </div>
@@ -349,7 +391,7 @@ function InvoiceModal({ shipment, paymentSettings, onClose, onPrint, onPaymentSu
 }
 
 function PaymentSection({
-  invoice, paymentSettings, total, canSubmitPayment,
+  invoice, paymentSettings, total, currencyCode, canSubmitPayment,
   screenshotFile, setScreenshotFile, note, setNote, submitting, onSubmit,
 }) {
   const [qrLoadFailed, setQrLoadFailed] = useState(false);
@@ -435,7 +477,7 @@ function PaymentSection({
             </div>
           )}
           <p className="text-xs text-gray-500 mt-2">Scan to pay</p>
-          <p className="text-sm font-bold text-gray-900">${total.toFixed(2)}</p>
+          <p className="text-sm font-bold text-gray-900">{formatMoney(total, currencyCode)}</p>
         </div>
         <div className="flex-1 min-w-0">
           {paymentSettings?.instructions && (
