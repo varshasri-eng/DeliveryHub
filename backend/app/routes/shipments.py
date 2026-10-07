@@ -141,22 +141,7 @@ def _validate_booking(data):
     submitted_values = data.get("field_values") or {}
     field_values = {}
     is_document_service = service.slug in {"document-services", "document-shipping"}
-    if is_document_service:
-        booking_fields = [
-            field for field in service.fields
-            if field.field_type == "date"
-        ]
-        if not booking_fields:
-            booking_date = submitted_values.get("booking_date")
-            if booking_date is None or (
-                isinstance(booking_date, str) and not booking_date.strip()
-            ):
-                return None, None, None, None, None, None, None, (
-                    jsonify({"error": "'Date of Booking' is required."}), 400
-                )
-            field_values["booking_date"] = booking_date
-    else:
-        booking_fields = service.fields
+    booking_fields = [] if is_document_service else service.fields
 
     for field in booking_fields:
         value = submitted_values.get(field.field_key)
@@ -293,34 +278,37 @@ def create_guest_shipment():
 
     if not guest_name:
         return jsonify({"error": "Name is required."}), 400
-    if not guest_email:
-        return jsonify({"error": "Email is required."}), 400
-
     from app.models.customer import Customer
-    customer = Customer.query.filter_by(email=guest_email).first()
-    if not customer:
-        guest_phone = guest_phone or f"guest-{guest_email.split('@')[0]}"
-        if Customer.query.filter_by(phone=guest_phone).first():
-            guest_phone = f"guest-{secrets.token_hex(6)}"
-        customer = Customer(
-            name=guest_name,
-            email=guest_email,
-            phone=guest_phone,
-            role="customer",
-            is_active=True,
-        )
-        db.session.add(customer)
-        db.session.flush()
-
     service, tier, sub_service, quantity, field_values, sender, receiver, err = _validate_booking(data)
     if err:
         return err
+
+    is_document_service = service.slug in {"document-services", "document-shipping"}
+    if not guest_email and not is_document_service:
+        return jsonify({"error": "Email is required."}), 400
+
+    customer = None
+    if guest_email:
+        customer = Customer.query.filter_by(email=guest_email).first()
+        if not customer:
+            guest_phone = guest_phone or f"guest-{guest_email.split('@')[0]}"
+            if Customer.query.filter_by(phone=guest_phone).first():
+                guest_phone = f"guest-{secrets.token_hex(6)}"
+            customer = Customer(
+                name=guest_name,
+                email=guest_email,
+                phone=guest_phone,
+                role="customer",
+                is_active=True,
+            )
+            db.session.add(customer)
+            db.session.flush()
 
     unit_price, total_price = _price_booking(tier, sub_service, quantity)
 
     shipment = Shipment(
         shipment_number=generate_shipment_number(),
-        customer_id=customer.id,
+        customer_id=customer.id if customer else None,
         route_direction=route_direction,
         service_type_id=service.id,
         pricing_tier_id=tier.id,

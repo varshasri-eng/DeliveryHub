@@ -59,7 +59,9 @@ function Err({ show, msg }) {
   return <p className="text-xs font-medium text-red-600 mt-1">{msg}</p>;
 }
 
-function PartyCard({ letter, title, subtitle, who, value, onChange, errors, showErrors, country }) {
+function PartyCard({
+  letter, title, subtitle, who, value, onChange, errors, showErrors, country, compact = false,
+}) {
   const [touched, setTouched] = useState({});
   const set = (k) => (e) => onChange({ ...value, [k]: e.target.value });
   const blur = (k) => () => setTouched((t) => ({ ...t, [k]: true }));
@@ -67,8 +69,8 @@ function PartyCard({ letter, title, subtitle, who, value, onChange, errors, show
   const cls = (k) => `input ${show(k) ? "border-red-400" : ""}`;
 
   return (
-    <div className="card">
-      <div className="flex items-center gap-2 mb-4">
+    <div className={`card ${compact ? "p-3" : ""}`}>
+      <div className={`flex items-center gap-2 ${compact ? "mb-2" : "mb-4"}`}>
         <span className={`w-7 h-7 rounded-full flex items-center justify-center text-white text-xs font-bold
                           ${letter === "A" ? "bg-gray-900" : "bg-brand-600"}`}>
           {letter}
@@ -82,15 +84,16 @@ function PartyCard({ letter, title, subtitle, who, value, onChange, errors, show
         </span>
       </div>
 
-      <div className="space-y-3">
-        <div>
+      <div className={compact ? "space-y-2" : "space-y-3"}>
+        <div className={compact ? "grid grid-cols-2 gap-2" : ""}>
+          <div>
           <label className="label">Full name *</label>
           <input className={cls("name")} placeholder={who === "sender" ? "Sender name" : "Recipient name"}
             value={value.name} onChange={set("name")} onBlur={blur("name")} />
           <Err show={show("name")} msg={errors.name} />
-        </div>
+          </div>
 
-        <div>
+          <div>
           <label className="label">Phone *</label>
           <div className="grid grid-cols-[72px_1fr] gap-2">
             <span className="input flex items-center justify-center text-gray-500">+{country.phoneCode}</span>
@@ -98,6 +101,7 @@ function PartyCard({ letter, title, subtitle, who, value, onChange, errors, show
               value={value.phone} onChange={set("phone")} onBlur={blur("phone")} />
           </div>
           <Err show={show("phone")} msg={errors.phone} />
+          </div>
         </div>
 
         <div className="grid grid-cols-2 gap-2">
@@ -311,18 +315,7 @@ export default function BookShipmentPage() {
   const unitPrice = subservice ? Number(subservice.price) : Number(tier?.price || 0);
   const total = unitPrice * effectiveQty;
   const isDocumentService = ["document-services", "document-shipping"].includes(service.slug);
-  const configuredFields = service.fields || [];
-  const documentDateField = isDocumentService
-    ? configuredFields.find((field) => field.field_type === "date") || {
-        id: "booking-date",
-        field_key: "booking_date",
-        field_type: "date",
-        label: "Date of Booking",
-      }
-    : null;
-  const fields = isDocumentService
-    ? [{ ...documentDateField, label: "Date of Booking" }]
-    : configuredFields;
+  const fields = isDocumentService ? [] : service.fields || [];
   const shortName = service.name.replace(/\s+services?$/i, "");
 
   const setField = (key, value) => setFieldValues((prev) => ({ ...prev, [key]: value }));
@@ -337,7 +330,9 @@ export default function BookShipmentPage() {
       fieldErrors[f.field_key] = `${f.label} is required.`;
     }
   });
-  const emailError = !customer && !/^\S+@\S+\.\S+$/.test(guestEmail.trim()) ? "Enter a valid email." : "";
+  const emailError = !customer && !isDocumentService && !/^\S+@\S+\.\S+$/.test(guestEmail.trim())
+    ? "Enter a valid email."
+    : "";
   const hasErrors = !tier || (subservices.length > 0 && !subservice) ||
     Object.keys(senderErrors).length || Object.keys(receiverErrors).length ||
     Object.keys(fieldErrors).length || emailError;
@@ -417,14 +412,18 @@ export default function BookShipmentPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10">
       <form onSubmit={submit} noValidate
-        className="grid lg:grid-cols-[260px_1fr_1fr_300px] gap-5 items-start">
-        <fieldset className="card lg:col-span-4">
-          <legend className="px-1 text-sm font-bold text-gray-900">Choose shipping direction</legend>
-          <div className="grid sm:grid-cols-2 gap-3 mt-2">
-            {Object.entries(DIRECTIONS).map(([key, option]) => (
-              <label key={key}
-                className={`flex cursor-pointer items-center gap-3 rounded-xl border-2 p-3 transition-colors
-                  ${direction === key ? "border-brand-500 bg-brand-50" : "border-gray-200 hover:border-gray-300"}`}>
+        className={`grid gap-3 items-start ${
+          isDocumentService
+            ? "lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_290px]"
+            : "lg:grid-cols-[260px_1fr_1fr_300px] gap-5"
+        }`}>
+          <fieldset className={`card ${isDocumentService ? "p-3 lg:col-span-3" : "lg:col-span-4"}`}>
+            <legend className="px-1 text-sm font-bold text-gray-900">Choose shipping direction</legend>
+            <div className="grid sm:grid-cols-2 gap-2 mt-1">
+              {Object.entries(DIRECTIONS).map(([key, option]) => (
+                <label key={key}
+                  className={`flex cursor-pointer items-center gap-2 rounded-xl border-2 p-2 transition-colors
+                    ${direction === key ? "border-brand-500 bg-brand-50" : "border-gray-200 hover:border-gray-300"}`}>
                 <input type="radio" name="route_direction" value={key}
                   checked={direction === key} onChange={() => setDirection(key)} />
                 <span className="font-semibold text-gray-900">{option.label}</span>
@@ -434,7 +433,7 @@ export default function BookShipmentPage() {
         </fieldset>
 
         {/* Hero column */}
-        <div className="lg:row-span-3 lg:pr-4">
+        {!isDocumentService && <div className="lg:row-span-3 lg:pr-4">
           <p className="text-xs font-bold uppercase tracking-widest text-brand-600 mb-3">Shipment Details</p>
           <h1 className="text-4xl font-extrabold text-gray-900 leading-tight mb-4">
             Send {shortName.toLowerCase()} from {route.from.name} to {route.to.name}.
@@ -447,16 +446,40 @@ export default function BookShipmentPage() {
             <li className="flex items-center gap-3"><FiArrowUp className="text-brand-600 shrink-0" /> One screen from pickup to review</li>
             <li className="flex items-center gap-3"><FiMessageSquare className="text-brand-600 shrink-0" /> Instant help on WhatsApp</li>
           </ul>
-        </div>
+        </div>}
 
         <PartyCard letter="A" title="From" subtitle="Pickup contact and address" who="sender"
-          value={sender} onChange={setSender} errors={senderErrors} showErrors={showErrors} country={route.from} />
+          value={sender} onChange={setSender} errors={senderErrors} showErrors={showErrors} country={route.from}
+          compact={isDocumentService} />
         <PartyCard letter="B" title="To" subtitle="Recipient and delivery address" who="receiver"
-          value={receiver} onChange={setReceiver} errors={receiverErrors} showErrors={showErrors} country={route.to} />
+          value={receiver} onChange={setReceiver} errors={receiverErrors} showErrors={showErrors} country={route.to}
+          compact={isDocumentService} />
 
         {/* Sticky summary sidebar */}
-        <div className="card lg:sticky lg:top-6 lg:row-span-3 space-y-3">
-          <p className="font-bold text-gray-900 text-lg">Your route</p>
+        <div className={`card ${isDocumentService ? "p-3 space-y-2" : "space-y-3 lg:sticky lg:top-6 lg:row-span-3"}`}>
+          {isDocumentService && subservices.length > 0 && (
+            <div>
+              <p className="font-semibold text-gray-900 text-sm mb-2">
+                {tier.tier_name} sub-services
+              </p>
+              <div className="space-y-1.5">
+                {subservices.map((option) => (
+                  <button key={option.id} type="button"
+                    onClick={() => setSelectedSubserviceId(option.id)}
+                    aria-pressed={subservice?.id === option.id}
+                    className={`w-full flex items-center gap-2 rounded-lg border-2 px-2 py-1.5 text-left transition-colors
+                      ${subservice?.id === option.id
+                        ? "border-brand-500 bg-brand-50"
+                        : "border-gray-200 hover:border-gray-300"}`}>
+                    <span>{option.icon || "📦"}</span>
+                    <span className="flex-1 text-xs font-semibold text-gray-900">{option.name}</span>
+                    <span className="text-xs font-bold text-gray-900">{money(option.price)}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+          <p className={`font-bold text-gray-900 ${isDocumentService ? "text-sm" : "text-lg"}`}>Your route</p>
           <div className="space-y-3 text-sm">
             <div className="flex items-start gap-3">
               <span className="mt-1 w-3.5 h-3.5 rounded-full border-2 border-gray-900 flex items-center justify-center">
@@ -512,7 +535,7 @@ export default function BookShipmentPage() {
         </div>
 
         {/* Details section under the two address cards */}
-        <div className="lg:col-span-2 space-y-5">
+        {!isDocumentService && <div className="lg:col-span-2 space-y-5">
           {subservices.length > 0 && (
             <div className="card">
               <div className="flex items-baseline justify-between mb-4">
@@ -543,7 +566,7 @@ export default function BookShipmentPage() {
             </div>
           )}
 
-          {!customer && (
+          {!customer && !isDocumentService && (
             <div className="card">
               <p className="text-sm text-gray-500 mb-3">
                 Booking as a guest.{" "}
@@ -580,7 +603,7 @@ export default function BookShipmentPage() {
               </div>
             </div>
           )}
-        </div>
+        </div>}
       </form>
 
       <a href={`https://wa.me/${WHATSAPP_NUMBER}`} target="_blank" rel="noreferrer"
