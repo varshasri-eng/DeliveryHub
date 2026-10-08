@@ -74,7 +74,10 @@ non-date Document Services questions so existing database rows do not block
 bookings before that migration is applied. Migration
 `007_add_directional_pricing.sql` adds separate USD and INR prices for delivery
 tiers and sub-services, and snapshots the booking currency on shipments. INR
-prices remain unset until an admin configures them.
+prices remain unset until an admin configures them. Migration
+`008_seed_air_and_sea_cargo.sql` adds the Air Cargo and Sea Cargo descriptions,
+coverage and restrictions, and USA → India weight options. Those prices are
+stored in USD; no INR values are inferred.
 
 ## Project structure
 
