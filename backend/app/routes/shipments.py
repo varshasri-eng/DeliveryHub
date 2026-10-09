@@ -433,10 +433,6 @@ def create_guest_shipment():
     if err:
         return err
 
-    is_document_service = service.slug in {"document-services", "document-shipping"}
-    if not guest_email and not is_document_service:
-        return jsonify({"error": "Email is required."}), 400
-
     customer = None
     if guest_email:
         customer = Customer.query.filter_by(email=guest_email).first()

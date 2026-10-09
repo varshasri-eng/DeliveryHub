@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
 import toast from "react-hot-toast";
-import { FiCheckCircle, FiCheck, FiArrowUp, FiMessageCircle, FiMessageSquare, FiDownload } from "react-icons/fi";
+import { FiCheckCircle, FiCheck, FiMessageCircle, FiDownload } from "react-icons/fi";
 import { getService } from "../api/services";
 import { createShipment, createGuestShipment } from "../api/shipments";
 import { useAuth } from "../context/AuthContext";
@@ -241,7 +241,6 @@ export default function BookShipmentPage() {
   const [direction, setDirection] = useState("US_TO_IN");
   const [sender, setSender] = useState(emptyParty());
   const [receiver, setReceiver] = useState(emptyParty());
-  const [guestEmail, setGuestEmail] = useState("");
   const [fieldValues, setFieldValues] = useState({});
   const [showErrors, setShowErrors] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -376,12 +375,9 @@ export default function BookShipmentPage() {
       fieldErrors[f.field_key] = `${f.label} is required.`;
     }
   });
-  const emailError = !customer && !isDocumentService && !/^\S+@\S+\.\S+$/.test(guestEmail.trim())
-    ? "Enter a valid email."
-    : "";
   const hasErrors = !tier || (subservices.length > 0 && !subservice) || selectedPrice == null ||
     Object.keys(senderErrors).length || Object.keys(receiverErrors).length ||
-    Object.keys(fieldErrors).length || emailError;
+    Object.keys(fieldErrors).length;
 
   // Sidebar summary adapts to this service's own fields
   const summarySelectField = fields.find((f) => f.field_type === "select");
@@ -427,7 +423,6 @@ export default function BookShipmentPage() {
         : await createGuestShipment({
             ...payload,
             guest_name: sender.name.trim(),
-            guest_email: guestEmail.trim(),
             guest_phone: payload.sender_phone,
           });
       const shipment = res.data.shipment;
@@ -487,12 +482,8 @@ export default function BookShipmentPage() {
   return (
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10">
       <form onSubmit={submit} noValidate
-        className={`grid gap-3 items-start ${
-          isDocumentService
-            ? "lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_290px]"
-            : "lg:grid-cols-[260px_1fr_1fr_300px] gap-5"
-        }`}>
-          <fieldset className={`card ${isDocumentService ? "p-3 lg:col-span-3" : "lg:col-span-4"}`}>
+        className="grid gap-3 items-start lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_290px]">
+          <fieldset className="card p-3 lg:col-span-3">
             <legend className="px-1 text-sm font-bold text-gray-900">Choose shipping direction</legend>
             <div className="grid sm:grid-cols-2 gap-2 mt-1">
               {Object.entries(DIRECTIONS).map(([key, option]) => (
@@ -507,32 +498,16 @@ export default function BookShipmentPage() {
           </div>
         </fieldset>
 
-        {/* Hero column */}
-        {!isDocumentService && <div className="lg:row-span-3 lg:pr-4">
-          <p className="text-xs font-bold uppercase tracking-widest text-brand-600 mb-3">Shipment Details</p>
-          <h1 className="text-4xl font-extrabold text-gray-900 leading-tight mb-4">
-            Send {shortName.toLowerCase()} from {route.from.name} to {route.to.name}.
-          </h1>
-          <p className="text-gray-500 mb-6">
-            Enter pickup and delivery details. Use the {route.from.postalLabel} for pickup and the {route.to.postalLabel} for delivery.
-          </p>
-          <ul className="space-y-3 text-sm text-gray-700">
-            <li className="flex items-center gap-3"><FiCheck className="text-brand-600 shrink-0" /> Inline checks, no surprise errors</li>
-            <li className="flex items-center gap-3"><FiArrowUp className="text-brand-600 shrink-0" /> One screen from pickup to review</li>
-            <li className="flex items-center gap-3"><FiMessageSquare className="text-brand-600 shrink-0" /> Instant help on WhatsApp</li>
-          </ul>
-        </div>}
-
         <PartyCard letter="A" title="From" subtitle="Pickup contact and address" who="sender"
           value={sender} onChange={setSender} errors={senderErrors} showErrors={showErrors} country={route.from}
-          compact={isDocumentService} />
+          compact />
         <PartyCard letter="B" title="To" subtitle="Recipient and delivery address" who="receiver"
           value={receiver} onChange={setReceiver} errors={receiverErrors} showErrors={showErrors} country={route.to}
-          compact={isDocumentService} />
+          compact />
 
         {/* Sticky summary sidebar */}
-        <div className={`card ${isDocumentService ? "p-3 space-y-2" : "space-y-3 lg:sticky lg:top-6 lg:row-span-3"}`}>
-          {isDocumentService && subservices.length > 0 && (
+        <div className="card p-3 space-y-2">
+          {subservices.length > 0 && (
             <div>
               <p className="font-semibold text-gray-900 text-sm mb-2">
                 {tier.tier_name} sub-services
@@ -556,7 +531,7 @@ export default function BookShipmentPage() {
               </div>
             </div>
           )}
-          <p className={`font-bold text-gray-900 ${isDocumentService ? "text-sm" : "text-lg"}`}>Your route</p>
+          <p className="font-bold text-gray-900 text-sm">Your route</p>
           <div className="space-y-3 text-sm">
             <div className="flex items-start gap-3">
               <span className="mt-1 w-3.5 h-3.5 rounded-full border-2 border-gray-900 flex items-center justify-center">
@@ -613,76 +588,20 @@ export default function BookShipmentPage() {
           <p className="text-xs text-gray-400 text-center">No payment at this step</p>
         </div>
 
-        {/* Details section under the two address cards */}
-        {!isDocumentService && <div className="lg:col-span-2 space-y-5">
-          {subservices.length > 0 && (
-            <div className="card">
-              <div className="flex items-baseline justify-between mb-4">
-                <h2 className="font-bold text-gray-900 text-lg">
-                  {tier.tier_name} sub-services
-                </h2>
-                <span className="text-xs text-gray-400">
-                  Choose one; its price is the booking price.
-                </span>
-              </div>
-              <div className="grid sm:grid-cols-3 gap-3">
-                {subservices.map((option) => (
-                  <button key={option.id} type="button"
-                    onClick={() => setSelectedSubserviceId(option.id)}
-                    aria-pressed={subservice?.id === option.id}
-                    className={`rounded-xl border-2 p-3 text-left transition-colors
-                      ${subservice?.id === option.id
-                        ? "border-brand-500 bg-brand-50"
-                        : "border-gray-200 hover:border-gray-300"}`}>
-                    <span className="text-xl">{option.icon || "📦"}</span>
-                    <span className="mt-2 block font-bold text-gray-900">{option.name}</span>
-                    <span className="mt-3 block font-extrabold text-gray-900">
-                      {money(option[priceKey], currencyCode)}
-                    </span>
-                  </button>
-                ))}
-              </div>
+        {fields.length > 0 && (
+          <div className="card lg:col-span-3">
+            <h2 className="font-bold text-gray-900 text-lg mb-4">{shortName} details</h2>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
+              {fields.map((f) => (
+                <DynamicField key={f.id}
+                  field={f}
+                  value={fieldValues[f.field_key]}
+                  onChange={(v) => setField(f.field_key, v)}
+                  error={fieldErrors[f.field_key]} showError={showErrors} />
+              ))}
             </div>
-          )}
-
-          {!customer && !isDocumentService && (
-            <div className="card">
-              <p className="text-sm text-gray-500 mb-3">
-                Booking as a guest.{" "}
-                <Link to="/login" className="text-brand-600 font-semibold hover:underline">Sign in</Link>{" "}
-                to fill in your details automatically next time.
-              </p>
-              <label className="label">Your email *</label>
-              <input className={`input ${showErrors && emailError ? "border-red-400" : ""}`} type="email"
-                value={guestEmail} onChange={(e) => setGuestEmail(e.target.value)} />
-              <Err show={showErrors} msg={emailError} />
-            </div>
-          )}
-
-          {fields.length > 0 && (
-            <div className="card">
-              <div className="flex items-baseline justify-between mb-4">
-                <h2 className="font-bold text-gray-900 text-lg">
-                  {isDocumentService ? "Booking date" : `${shortName} details`}
-                </h2>
-                {!isDocumentService && (
-                  <span className="text-xs text-gray-400">Choose the closest fit.</span>
-                )}
-              </div>
-              <div className="grid lg:grid-cols-[minmax(0,1fr)_200px] gap-4 items-start">
-                {fields.map((f) => (
-                  <div key={f.id}
-                    className={f.field_type === "select" || f.field_type === "textarea" ? "" : ""}>
-                    <DynamicField field={f}
-                      value={fieldValues[f.field_key]}
-                      onChange={(v) => setField(f.field_key, v)}
-                      error={fieldErrors[f.field_key]} showError={showErrors} />
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-        </div>}
+          </div>
+        )}
       </form>
 
       <a href={`https://wa.me/${WHATSAPP_NUMBER}`} target="_blank" rel="noreferrer"
