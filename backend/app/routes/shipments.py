@@ -17,10 +17,13 @@ the customer actually filled in every field the admin configured for
 that service (service_fields), not about availability.
 """
 
+import json
 import os
 import re
 import secrets
 from datetime import datetime, timezone
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
 
 from flask import Blueprint, request, jsonify, current_app
 from werkzeug.utils import secure_filename
@@ -39,6 +42,91 @@ ROUTE_COUNTRIES = {
     "US_TO_IN": ("United States", "India"),
     "IN_TO_US": ("India", "United States"),
 }
+US_TOLL_FREE_CODES = {"800", "833", "844", "855", "866", "877", "888"}
+US_STATE_ABBREVIATIONS = {
+    "alabama": "al", "alaska": "ak", "arizona": "az", "arkansas": "ar",
+    "california": "ca", "colorado": "co", "connecticut": "ct", "delaware": "de",
+    "florida": "fl", "georgia": "ga", "hawaii": "hi", "idaho": "id",
+    "illinois": "il", "indiana": "in", "iowa": "ia", "kansas": "ks",
+    "kentucky": "ky", "louisiana": "la", "maine": "me", "maryland": "md",
+    "massachusetts": "ma", "michigan": "mi", "minnesota": "mn", "mississippi": "ms",
+    "missouri": "mo", "montana": "mt", "nebraska": "ne", "nevada": "nv",
+    "new hampshire": "nh", "new jersey": "nj", "new mexico": "nm", "new york": "ny",
+    "north carolina": "nc", "north dakota": "nd", "ohio": "oh", "oklahoma": "ok",
+    "oregon": "or", "pennsylvania": "pa", "rhode island": "ri", "south carolina": "sc",
+    "south dakota": "sd", "tennessee": "tn", "texas": "tx", "utah": "ut",
+    "vermont": "vt", "virginia": "va", "washington": "wa", "west virginia": "wv",
+    "wisconsin": "wi", "wyoming": "wy", "district of columbia": "dc",
+}
+
+
+def _normalize_location(value):
+    return re.sub(r"[^a-z0-9]", "", (value or "").casefold())
+
+
+def _lookup_postal_locations(country, postal_code):
+    lookup_postal_code = postal_code[:5] if country == "United States" else postal_code
+    if country == "United States":
+        url = f"https://api.zippopotam.us/us/{lookup_postal_code}"
+    else:
+        url = f"https://api.postalpincode.in/pincode/{lookup_postal_code}"
+
+    request = Request(url, headers={"User-Agent": "DeliveryHub/1.0"})
+    try:
+        with urlopen(request, timeout=4) as response:
+            result = json.loads(response.read().decode("utf-8"))
+    except HTTPError as error:
+        if error.code == 404:
+            return []
+        current_app.logger.warning(
+            "Postal lookup failed for %s: HTTP %s", country, error.code
+        )
+        raise RuntimeError("Postal-code verification is temporarily unavailable. Please try again.") from error
+    except (URLError, TimeoutError, OSError, ValueError) as error:
+        current_app.logger.warning("Postal lookup failed for %s: %s", country, type(error).__name__)
+        raise RuntimeError("Postal-code verification is temporarily unavailable. Please try again.") from error
+
+    if country == "United States":
+        places = result.get("places") if isinstance(result, dict) else None
+        if not places:
+            return []
+        return [
+            {
+                "cities": [place.get("place name", "")],
+                "states": [place.get("state", ""), place.get("state abbreviation", "")],
+            }
+            for place in places
+        ]
+
+    if not isinstance(result, list) or not result or result[0].get("Status") != "Success":
+        return []
+    offices = result[0].get("PostOffice") or []
+    return [
+        {
+            "cities": [office.get("Name", ""), office.get("District", "")],
+            "states": [office.get("State", "")],
+        }
+        for office in offices
+    ]
+
+
+def _phone_error(phone, country, role):
+    if re.search(r"[^\d\s()+.-]", phone or ""):
+        return f"Enter a valid {role} phone number for {country}."
+    digits = re.sub(r"\D", "", phone or "")
+    country_code = "91" if country == "India" else "1"
+    if not digits.startswith(country_code):
+        return f"Enter a valid {role} phone number for {country}."
+    national_number = digits[len(country_code):]
+    if country == "India":
+        if not re.fullmatch(r"[6-9]\d{9}", national_number):
+            return f"Enter a valid 10-digit {role} Indian mobile number starting with 6, 7, 8, or 9."
+    else:
+        if not re.fullmatch(r"[2-9]\d{2}[2-9]\d{6}", national_number):
+            return f"Enter a valid 10-digit {role} U.S. phone number."
+        if national_number[:3] in US_TOLL_FREE_CODES:
+            return f"Toll-free numbers cannot be used as the {role} contact."
+    return None
 
 
 def _validate_route_details(data, direction):
@@ -54,9 +142,52 @@ def _validate_route_details(data, direction):
         postal_code = (data.get(f"{role}_postal_code") or "").strip()
         if expected_country == "India":
             if not re.fullmatch(r"\d{6}", postal_code):
-                return jsonify({"error": f"Enter a valid 6-digit {role} PIN code."}), 400
+                return jsonify({"error": f"Enter a valid 6-digit {role} postal code."}), 400
         elif not re.fullmatch(r"\d{5}(?:-\d{4})?", postal_code):
             return jsonify({"error": f"Enter a valid {role} ZIP code (5 digits or ZIP+4)."}), 400
+
+        phone_error = _phone_error(data.get(f"{role}_phone"), expected_country, role)
+        if phone_error:
+            return jsonify({"error": phone_error}), 400
+
+        city = (data.get(f"{role}_city") or "").strip()
+        province = (data.get(f"{role}_province") or "").strip()
+        if not city:
+            return jsonify({"error": f"Enter the {role} city."}), 400
+        if not province:
+            return jsonify({"error": f"Enter the {role} state or province."}), 400
+        try:
+            locations = _lookup_postal_locations(expected_country, postal_code)
+        except RuntimeError as error:
+            return jsonify({"error": str(error)}), 503
+        if not locations:
+            label = "ZIP code" if expected_country == "United States" else "postal code"
+            return jsonify({"error": f"The {role} {label} was not found."}), 400
+
+        city_matches = any(
+            _normalize_location(city) == _normalize_location(candidate)
+            for location in locations for candidate in location["cities"] if candidate
+        )
+        state_values = {
+            _normalize_location(candidate)
+            for location in locations for candidate in location["states"] if candidate
+        }
+        if expected_country == "United States":
+            matched_state_abbr = next(
+                (abbr for state, abbr in US_STATE_ABBREVIATIONS.items()
+                 if _normalize_location(state) in state_values),
+                None,
+            )
+            if matched_state_abbr:
+                state_values.add(_normalize_location(matched_state_abbr))
+        state_matches = _normalize_location(province) in state_values
+        if not city_matches or not state_matches:
+            return jsonify({
+                "error": (
+                    f"The {role} city and state/province do not match "
+                    f"postal code {postal_code}."
+                )
+            }), 400
     return None
 
 

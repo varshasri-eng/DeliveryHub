@@ -99,4 +99,7 @@ New services created in the admin portal start with Express, Economy, and
 Group delivery options. Admins can change their names, descriptions, delivery
 estimates, icons, and fixed prices. Booking supports both United States → India
 and India → United States; country, phone code, and ZIP/PIN validation adapt to
-the selected direction.
+the selected direction. Booking also validates Indian mobile numbers, rejects
+U.S. toll-free contacts, and checks city/state against the ZIP/PIN using public
+postal-code lookup services. Only the postal code is sent to those services. If
+postal verification is unavailable, booking returns an explicit retryable error.

@@ -15,16 +15,17 @@ const DIRECTIONS = {
   US_TO_IN: {
     label: "United States → India",
     currencyCode: "USD",
-    from: { name: "United States", shortName: "USA", phoneCode: "1", postalLabel: "ZIP Code", postalPlaceholder: "94105", postalPattern: /^\d{5}(?:-\d{4})?$/ },
-    to: { name: "India", shortName: "India", phoneCode: "91", postalLabel: "Postal Code", postalPlaceholder: "500072", postalPattern: /^\d{6}$/ },
+    from: { name: "United States", shortName: "USA", phoneCode: "1", postalLabel: "ZIP Code", postalPlaceholder: "94105", postalPattern: /^\d{5}(?:-\d{4})?$/, phonePattern: /^[2-9]\d{2}[2-9]\d{6}$/ },
+    to: { name: "India", shortName: "India", phoneCode: "91", postalLabel: "Postal Code", postalPlaceholder: "500072", postalPattern: /^\d{6}$/, phonePattern: /^[6-9]\d{9}$/ },
   },
   IN_TO_US: {
     label: "India → United States",
     currencyCode: "INR",
-    from: { name: "India", shortName: "India", phoneCode: "91", postalLabel: "Postal Code", postalPlaceholder: "500072", postalPattern: /^\d{6}$/ },
-    to: { name: "United States", shortName: "USA", phoneCode: "1", postalLabel: "ZIP Code", postalPlaceholder: "94105", postalPattern: /^\d{5}(?:-\d{4})?$/ },
+    from: { name: "India", shortName: "India", phoneCode: "91", postalLabel: "Postal Code", postalPlaceholder: "500072", postalPattern: /^\d{6}$/, phonePattern: /^[6-9]\d{9}$/ },
+    to: { name: "United States", shortName: "USA", phoneCode: "1", postalLabel: "ZIP Code", postalPlaceholder: "94105", postalPattern: /^\d{5}(?:-\d{4})?$/, phonePattern: /^[2-9]\d{2}[2-9]\d{6}$/ },
   },
 };
+const US_TOLL_FREE_CODES = new Set(["800", "833", "844", "855", "866", "877", "888"]);
 
 const emptyParty = () => ({
   name: "", phone: "", postalCode: "", street: "", city: "", province: "",
@@ -44,7 +45,14 @@ function splitOption(o) {
 function validateParty(p, who, country) {
   const e = {};
   if (!p.name.trim()) e.name = `Enter the ${who}'s name.`;
-  if (p.phone.replace(/\D/g, "").length !== 10) e.phone = "Enter a valid 10-digit phone number.";
+  const phoneDigits = p.phone.replace(/\D/g, "");
+  if (/[^\d\s()+.-]/.test(p.phone) || !country.phonePattern.test(phoneDigits)) {
+    e.phone = country.name === "India"
+      ? "Enter a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9."
+      : "Enter a valid 10-digit U.S. phone number.";
+  } else if (country.name === "United States" && US_TOLL_FREE_CODES.has(phoneDigits.slice(0, 3))) {
+    e.phone = "Toll-free numbers cannot be used as shipment contacts.";
+  }
   if (!p.postalCode.trim()) {
     e.postalCode = `${country.postalLabel} is required.`;
   } else if (!country.postalPattern.test(p.postalCode.trim())) {
@@ -101,7 +109,9 @@ function PartyCard({
           <label className="label">Phone *</label>
           <div className="grid grid-cols-[72px_1fr] gap-2">
             <span className="input flex items-center justify-center text-gray-500">+{country.phoneCode}</span>
-            <input className={cls("phone")} placeholder="10-digit phone number" inputMode="tel"
+            <input className={cls("phone")}
+              placeholder={country.name === "India" ? "10-digit mobile number" : "10-digit U.S. number"}
+              inputMode="tel"
               value={value.phone} onChange={set("phone")} onBlur={blur("phone")} />
           </div>
           <Err show={show("phone")} msg={errors.phone} />
@@ -396,11 +406,15 @@ export default function BookShipmentPage() {
       sender_name: sender.name.trim(),
       sender_country: route.from.name,
       sender_postal_code: sender.postalCode.trim(),
+      sender_city: sender.city.trim(),
+      sender_province: sender.province.trim(),
       sender_phone: `+${route.from.phoneCode} ${sender.phone}`.trim(),
       sender_address: formatAddress(sender, route.from),
       receiver_name: receiver.name.trim(),
       receiver_country: route.to.name,
       receiver_postal_code: receiver.postalCode.trim(),
+      receiver_city: receiver.city.trim(),
+      receiver_province: receiver.province.trim(),
       receiver_phone: `+${route.to.phoneCode} ${receiver.phone}`.trim(),
       receiver_address: formatAddress(receiver, route.to),
       field_values: fieldValues,
