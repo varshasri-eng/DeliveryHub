@@ -210,6 +210,10 @@ def _validate_booking(data):
         return None, None, None, None, None, None, None, (
             jsonify({"error": "Service not found."}), 404
         )
+    if data.get("route_direction") != service.route_direction:
+        return None, None, None, None, None, None, None, (
+            jsonify({"error": "This service is not available for the selected shipment direction."}), 400
+        )
 
     tier = ServicePricingTier.query.filter_by(
         id=pricing_tier_id, service_type_id=service.id

@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
 import toast from "react-hot-toast";
-import { FiCheckCircle, FiCheck, FiMessageCircle, FiDownload } from "react-icons/fi";
+import { FiCheckCircle, FiMessageCircle, FiDownload } from "react-icons/fi";
 import { getService } from "../api/services";
 import { createShipment, createGuestShipment } from "../api/shipments";
 import { useAuth } from "../context/AuthContext";
@@ -238,7 +238,6 @@ export default function BookShipmentPage() {
   const [service, setService] = useState(null);
   const [notFound, setNotFound] = useState(false);
   const [loadError, setLoadError] = useState("");
-  const [direction, setDirection] = useState("US_TO_IN");
   const [sender, setSender] = useState(emptyParty());
   const [receiver, setReceiver] = useState(emptyParty());
   const [fieldValues, setFieldValues] = useState({});
@@ -250,6 +249,7 @@ export default function BookShipmentPage() {
   const [selectedTierId, setSelectedTierId] = useState(null);
   const [selectedSubserviceId, setSelectedSubserviceId] = useState(null);
   const quantity = Math.max(1, parseInt(searchParams.get("qty"), 10) || 1);
+  const direction = service?.route_direction || "US_TO_IN";
   const route = DIRECTIONS[direction];
 
   useEffect(() => {
@@ -359,7 +359,8 @@ export default function BookShipmentPage() {
     : tier?.[priceKey];
   const unitPrice = selectedPrice == null ? 0 : Number(selectedPrice);
   const total = unitPrice * effectiveQty;
-  const isDocumentService = ["document-services", "document-shipping"].includes(service.slug);
+  const isDocumentService = service.name.trim().toLowerCase() === "document services" ||
+    service.slug === "document-shipping";
   const fields = isDocumentService ? [] : service.fields || [];
   const shortName = service.name.replace(/\s+services?$/i, "");
 
@@ -472,7 +473,9 @@ export default function BookShipmentPage() {
           </button>
           {customer && <Link to="/account/shipments" className="btn-primary text-center">View My Shipments</Link>}
           <Link to="/track" className="btn-secondary text-center">Track this shipment</Link>
-          <Link to="/services" className="btn-secondary text-center">Book another shipment</Link>
+          <Link to={`/services?direction=${direction}`} className="btn-secondary text-center">
+            Book another shipment
+          </Link>
         </div>
         </div>
       </div>
@@ -483,20 +486,9 @@ export default function BookShipmentPage() {
     <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10">
       <form onSubmit={submit} noValidate
         className="grid gap-3 items-start lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_290px]">
-          <fieldset className="card p-3 lg:col-span-3">
-            <legend className="px-1 text-sm font-bold text-gray-900">Choose shipping direction</legend>
-            <div className="grid sm:grid-cols-2 gap-2 mt-1">
-              {Object.entries(DIRECTIONS).map(([key, option]) => (
-                <label key={key}
-                  className={`flex cursor-pointer items-center gap-2 rounded-xl border-2 p-2 transition-colors
-                    ${direction === key ? "border-brand-500 bg-brand-50" : "border-gray-200 hover:border-gray-300"}`}>
-                <input type="radio" name="route_direction" value={key}
-                  checked={direction === key} onChange={() => setDirection(key)} />
-                <span className="font-semibold text-gray-900">{option.label}</span>
-              </label>
-            ))}
-          </div>
-        </fieldset>
+          <p className="lg:col-span-3 text-sm font-semibold text-brand-700">
+            {DIRECTIONS[direction].label}
+          </p>
 
         <PartyCard letter="A" title="From" subtitle="Pickup contact and address" who="sender"
           value={sender} onChange={setSender} errors={senderErrors} showErrors={showErrors} country={route.from}

@@ -1,6 +1,8 @@
 from datetime import datetime, timezone
 from app import db
 
+VALID_ROUTE_DIRECTIONS = {"US_TO_IN", "IN_TO_US"}
+
 
 class ServiceType(db.Model):
     __tablename__ = "service_types"
@@ -8,6 +10,7 @@ class ServiceType(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(255), nullable=False)
     slug = db.Column(db.String(255), unique=True, nullable=False)
+    route_direction = db.Column(db.String(10), nullable=False, default="US_TO_IN")
     badge_label = db.Column(db.String(100))
     tagline = db.Column(db.String(255))
     description = db.Column(db.Text)
@@ -37,6 +40,7 @@ class ServiceType(db.Model):
             "id": self.id,
             "name": self.name,
             "slug": self.slug,
+            "route_direction": self.route_direction,
             "badge_label": self.badge_label,
             "tagline": self.tagline,
             "description": self.description,

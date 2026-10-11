@@ -6,19 +6,21 @@ GET /api/services/<slug>   - one service's full detail (coverage, restrictions,
                               pricing tiers, and the fields the booking form needs)
 """
 
-from flask import Blueprint, jsonify
-from app.models.service_type import ServiceType
+from flask import Blueprint, jsonify, request
+from app.models.service_type import ServiceType, VALID_ROUTE_DIRECTIONS
 
 services_bp = Blueprint("services", __name__)
 
 
 @services_bp.route("", methods=["GET"])
 def list_services():
-    services = (
-        ServiceType.query.filter_by(is_active=True)
-        .order_by(ServiceType.display_order, ServiceType.name)
-        .all()
-    )
+    query = ServiceType.query.filter_by(is_active=True)
+    direction = request.args.get("direction")
+    if direction:
+        if direction not in VALID_ROUTE_DIRECTIONS:
+            return jsonify({"error": "Choose a valid shipment direction."}), 400
+        query = query.filter_by(route_direction=direction)
+    services = query.order_by(ServiceType.display_order, ServiceType.name).all()
     return jsonify({
         "services": [s.to_dict() for s in services],
     }), 200

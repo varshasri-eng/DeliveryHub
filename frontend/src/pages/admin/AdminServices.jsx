@@ -12,6 +12,10 @@ import {
 import { formatMoney } from "../../utils/money";
 
 const FIELD_TYPES = ["text", "textarea", "number", "select", "checkbox", "date", "file"];
+const ROUTE_DIRECTIONS = [
+  { value: "US_TO_IN", label: "United States → India" },
+  { value: "IN_TO_US", label: "India → United States" },
+];
 
 /* ── Generic inline list editor (used for Coverage + Restrictions) ── */
 function BulletListEditor({ title, items, onAdd, onUpdate, onDelete }) {
@@ -394,6 +398,7 @@ function ServiceEditor({ serviceId, onBack, onDeleted }) {
           badge_label: res.data.service.badge_label || "",
           tagline: res.data.service.tagline || "",
           description: res.data.service.description || "",
+          route_direction: res.data.service.route_direction,
           icon: res.data.service.icon || "",
           enable_quantity: res.data.service.enable_quantity,
           is_active: res.data.service.is_active,
@@ -453,6 +458,18 @@ function ServiceEditor({ serviceId, onBack, onDeleted }) {
         <div>
           <label className="label">Name</label>
           <input className="input" value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} />
+        </div>
+        <div>
+          <label className="label">Shipping direction</label>
+          <select className="input" value={form.route_direction}
+            onChange={(e) => setForm({ ...form, route_direction: e.target.value })}>
+            {ROUTE_DIRECTIONS.map((direction) => (
+              <option key={direction.value} value={direction.value}>{direction.label}</option>
+            ))}
+          </select>
+          <p className="mt-1 text-xs text-gray-500">
+            This service has its own page, booking form, and pricing for this direction.
+          </p>
         </div>
         <div>
           <label className="label">Slug (URL)</label>
@@ -523,6 +540,7 @@ export default function AdminServices() {
   const [openId, setOpenId] = useState(null);
   const [creating, setCreating] = useState(false);
   const [newName, setNewName] = useState("");
+  const [newDirection, setNewDirection] = useState("US_TO_IN");
 
   const load = () => {
     setLoading(true);
@@ -537,10 +555,15 @@ export default function AdminServices() {
   const submitCreate = async () => {
     if (!newName.trim()) { toast.error("Name is required."); return; }
     try {
-      const res = await createService({ name: newName.trim(), display_order: services.length });
+      const res = await createService({
+        name: newName.trim(),
+        route_direction: newDirection,
+        display_order: services.length,
+      });
       toast.success("Service created — now add its details below.");
       setCreating(false);
       setNewName("");
+      setNewDirection("US_TO_IN");
       load();
       setOpenId(res.data.service.id);
     } catch (err) {
@@ -574,8 +597,15 @@ export default function AdminServices() {
           <input className="input flex-1" placeholder="Service name (e.g. Air Cargo)"
             value={newName} onChange={(e) => setNewName(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") submitCreate(); }} autoFocus />
+          <select className="input w-52" value={newDirection}
+            onChange={(e) => setNewDirection(e.target.value)}>
+            {ROUTE_DIRECTIONS.map((direction) => (
+              <option key={direction.value} value={direction.value}>{direction.label}</option>
+            ))}
+          </select>
           <button onClick={submitCreate} className="px-4 py-2 rounded-lg bg-brand-500 text-white font-semibold">Create</button>
-          <button onClick={() => { setCreating(false); setNewName(""); }} className="text-gray-400">Cancel</button>
+          <button onClick={() => { setCreating(false); setNewName(""); setNewDirection("US_TO_IN"); }}
+            className="text-gray-400">Cancel</button>
         </div>
       )}
 
@@ -594,6 +624,9 @@ export default function AdminServices() {
                   <p className="font-medium text-gray-900">
                     {s.name}
                     {!s.is_active && <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">Draft</span>}
+                  </p>
+                  <p className="text-xs font-semibold text-brand-700">
+                    {ROUTE_DIRECTIONS.find((direction) => direction.value === s.route_direction)?.label || s.route_direction}
                   </p>
                   <p className="text-sm text-gray-400">/services/{s.slug}</p>
                 </div>

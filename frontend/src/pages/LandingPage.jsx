@@ -4,6 +4,11 @@ import { FiArrowRight, FiCheckCircle, FiClock, FiPackage, FiShield, FiTruck } fr
 import { getServices } from "../api/services";
 import { useBranding } from "../context/BrandingContext";
 
+const DIRECTIONS = [
+  { id: "US_TO_IN", label: "United States to India", summary: "Ship from the U.S. to India" },
+  { id: "IN_TO_US", label: "India to United States", summary: "Ship from India to the U.S." },
+];
+
 const FEATURES = [
   {
     icon: <FiCheckCircle size={22} />,
@@ -32,12 +37,15 @@ export default function LandingPage() {
   const { settings } = useBranding();
   const [services, setServices] = useState([]);
   const [serviceLoadError, setServiceLoadError] = useState(false);
+  const [direction, setDirection] = useState("");
 
   useEffect(() => {
     getServices()
       .then((response) => setServices(response.data.services || []))
       .catch(() => setServiceLoadError(true));
   }, []);
+
+  const availableServices = services.filter((service) => service.route_direction === direction);
 
   return (
     <div className="bg-white">
@@ -58,10 +66,28 @@ export default function LandingPage() {
               Choose a shipping service, enter pickup and delivery details, and
               compare delivery options before booking.
             </p>
-            <div className="mt-8 flex flex-wrap gap-3">
+            <div className="mt-8">
+              <p className="mb-3 text-sm font-semibold text-gray-700">First, choose your shipping direction</p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                {DIRECTIONS.map((option) => (
+                  <button key={option.id} type="button"
+                    onClick={() => setDirection(option.id)}
+                    aria-pressed={direction === option.id}
+                    className={`rounded-xl border-2 p-4 text-left transition-colors ${
+                      direction === option.id
+                        ? "border-brand-500 bg-brand-50"
+                        : "border-gray-200 bg-white hover:border-brand-300"
+                    }`}>
+                    <span className="block font-semibold text-gray-900">{option.label}</span>
+                    <span className="mt-1 block text-sm text-gray-500">{option.summary}</span>
+                  </button>
+                ))}
+              </div>
+              <div className="mt-4 flex flex-wrap gap-3">
               <button
-                onClick={() => navigate("/services")}
-                className="btn-primary flex items-center gap-2 rounded-full !px-7 !py-3 text-base"
+                disabled={!direction}
+                onClick={() => navigate(`/services?direction=${direction}`)}
+                className="btn-primary flex items-center gap-2 rounded-full !px-7 !py-3 text-base disabled:opacity-50"
               >
                 Explore shipping services <FiArrowRight size={18} />
               </button>
@@ -77,6 +103,7 @@ export default function LandingPage() {
               >
                 Track a shipment
               </button>
+              </div>
             </div>
           </div>
 
@@ -84,9 +111,9 @@ export default function LandingPage() {
             <p className="text-sm font-bold uppercase tracking-wide text-gray-400">How it works</p>
             <div className="mt-5 space-y-4">
               {[
-                ["1", "Choose a shipping service"],
-                ["2", "Select a delivery option"],
-                ["3", "Enter shipment details in the booking form"],
+                ["1", "Choose your shipping direction"],
+                ["2", "Choose a service for that direction"],
+                ["3", "Select an option and enter shipment details"],
               ].map(([step, title]) => (
                 <div key={step} className="flex items-center gap-3 rounded-2xl bg-gray-50 p-4">
                   <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-brand-100 font-bold text-brand-700">
@@ -97,7 +124,7 @@ export default function LandingPage() {
               ))}
             </div>
             <p className="mt-5 text-sm leading-relaxed text-gray-500">
-              Choose your shipping direction at the start of the booking form.
+              Each direction has its own service list, pricing, and booking form.
             </p>
           </div>
         </div>
@@ -109,18 +136,25 @@ export default function LandingPage() {
             <p className="text-sm font-bold uppercase tracking-widest text-brand-700">What you can ship with</p>
             <h2 className="mt-2 text-2xl font-bold text-gray-900">Shipping services</h2>
           </div>
-          <button onClick={() => navigate("/services")} className="text-sm font-semibold text-brand-700 hover:underline">
-            View all services
-          </button>
+          {direction && (
+            <button onClick={() => navigate(`/services?direction=${direction}`)}
+              className="text-sm font-semibold text-brand-700 hover:underline">
+              View services for this direction
+            </button>
+          )}
         </div>
 
-        {serviceLoadError ? (
+        {!direction ? (
+          <p className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-8 text-center text-sm text-gray-500">
+            Choose a shipping direction above to see its services.
+          </p>
+        ) : serviceLoadError ? (
           <div role="alert" className="rounded-2xl border border-red-200 bg-red-50 p-6 text-center text-sm text-red-700">
             Shipping services could not be loaded. Please try again shortly.
           </div>
-        ) : services.length ? (
+        ) : availableServices.length ? (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {services.slice(0, 3).map((service) => (
+            {availableServices.slice(0, 3).map((service) => (
               <button
                 key={service.id}
                 onClick={() => navigate(`/services/${service.slug}`)}

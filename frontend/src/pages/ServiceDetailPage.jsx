@@ -65,7 +65,13 @@ export default function ServiceDetailPage() {
 
   const tiers = service.pricing_tiers || [];
   const tier = tiers.find((t) => t.id === tierId);
-  const total = tier ? Number(tier.price) * quantity : 0;
+  const currencyCode = service.route_direction === "IN_TO_US" ? "INR" : "USD";
+  const priceKey = currencyCode === "INR" ? "price_inr" : "price";
+  const tierPrice = tier?.[priceKey];
+  const total = tierPrice == null ? null : Number(tierPrice) * quantity;
+  const directionLabel = service.route_direction === "IN_TO_US"
+    ? "India → United States"
+    : "United States → India";
 
   const goBook = () => {
     if (!tier) return;
@@ -74,7 +80,7 @@ export default function ServiceDetailPage() {
 
   return (
     <div className="max-w-5xl mx-auto px-4 sm:px-6 py-10">
-      <Link to="/services"
+      <Link to={`/services?direction=${service.route_direction}`}
         className="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 mb-6">
         <FiArrowLeft size={14} /> Back to Services
       </Link>
@@ -88,6 +94,9 @@ export default function ServiceDetailPage() {
               {service.badge_label}
             </span>
           )}
+          <p className="mb-2 text-xs font-bold uppercase tracking-wide text-brand-700">
+            {directionLabel}
+          </p>
           <h1 className="text-4xl font-extrabold text-gray-900">{service.name}</h1>
           {service.tagline && (
             <p className="text-lg font-semibold text-brand-600 mt-3">{service.tagline}</p>
@@ -163,8 +172,7 @@ export default function ServiceDetailPage() {
                       <span className="text-xs font-semibold text-gray-500">Choose an option</span>
                     ) : (
                       <span className="text-right text-sm font-extrabold text-gray-900">
-                        <span className="block">{formatMoney(t.price, "USD")}</span>
-                        <span className="block">{formatMoney(t.price_inr, "INR")}</span>
+                        {formatMoney(t[priceKey], currencyCode)}
                       </span>
                     )}
                   </button>
@@ -176,8 +184,7 @@ export default function ServiceDetailPage() {
                           <div key={option.id} className="flex items-center justify-between gap-3 text-sm">
                             <span className="text-gray-700">{option.name}</span>
                             <span className="text-right text-xs font-semibold text-gray-900">
-                              <span className="block">{formatMoney(option.price, "USD")}</span>
-                              <span className="block">{formatMoney(option.price_inr, "INR")}</span>
+                              {formatMoney(option[priceKey], currencyCode)}
                             </span>
                           </div>
                         ))}
@@ -210,12 +217,8 @@ export default function ServiceDetailPage() {
 
               <div className="mt-4 bg-gray-900 text-white rounded-xl px-5 py-4 flex items-center justify-between">
                 <span className="text-sm">Total Amount:</span>
-                <span className="text-right">
-                  <span className="block text-2xl font-extrabold">{formatMoney(total, "USD")}</span>
-                  <span className="block text-sm font-semibold">{formatMoney(
-                    tier?.price_inr == null ? null : Number(tier.price_inr) * quantity,
-                    "INR",
-                  )}</span>
+                <span className="text-2xl font-extrabold">
+                  {total == null ? `${currencyCode} price not set` : formatMoney(total, currencyCode)}
                 </span>
               </div>
             </>
@@ -224,7 +227,7 @@ export default function ServiceDetailPage() {
           <button
             type="button"
             onClick={goBook}
-            disabled={!tier}
+            disabled={!tier || (tier.sub_services?.length === 0 && tierPrice == null)}
             className="mt-6 w-full flex items-center justify-center gap-2 bg-brand-600
                        hover:bg-brand-700 disabled:opacity-50 text-white font-semibold
                        py-4 rounded-xl transition-colors"

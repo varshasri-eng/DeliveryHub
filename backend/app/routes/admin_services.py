@@ -38,6 +38,7 @@ from app import db
 from app.models.service_type import (
     ServiceType, ServiceCoverageItem, ServiceRestriction,
     ServicePricingTier, ServiceSubservice, ServiceField, VALID_FIELD_TYPES,
+    VALID_ROUTE_DIRECTIONS,
 )
 from app.utils.auth import permission_required
 
@@ -105,13 +106,24 @@ def create_service(customer):
     if not name:
         return jsonify({"error": "Name is required."}), 400
 
-    slug = (data.get("slug") or "").strip() or _slugify(name)
+    route_direction = data.get("route_direction") or "US_TO_IN"
+    if route_direction not in VALID_ROUTE_DIRECTIONS:
+        return jsonify({"error": "Choose a valid shipment direction."}), 400
+
+    requested_slug = (data.get("slug") or "").strip()
+    slug = requested_slug or _slugify(name)
     if ServiceType.query.filter_by(slug=slug).first():
-        return jsonify({"error": f"A service with slug '{slug}' already exists."}), 409
+        if requested_slug:
+            return jsonify({"error": f"A service with slug '{slug}' already exists."}), 409
+        suffix = "usa-to-india" if route_direction == "US_TO_IN" else "india-to-usa"
+        slug = f"{slug}-{suffix}"
+        if ServiceType.query.filter_by(slug=slug).first():
+            return jsonify({"error": f"A service with slug '{slug}' already exists."}), 409
 
     service = ServiceType(
         name=name,
         slug=slug,
+        route_direction=route_direction,
         badge_label=(data.get("badge_label") or "").strip() or None,
         tagline=(data.get("tagline") or "").strip() or None,
         description=data.get("description") or None,
@@ -163,6 +175,10 @@ def update_service(customer, service_id):
         if existing:
             return jsonify({"error": f"A service with slug '{new_slug}' already exists."}), 409
         service.slug = new_slug
+    if "route_direction" in data:
+        if data["route_direction"] not in VALID_ROUTE_DIRECTIONS:
+            return jsonify({"error": "Choose a valid shipment direction."}), 400
+        service.route_direction = data["route_direction"]
     if "badge_label" in data:
         service.badge_label = (data["badge_label"] or "").strip() or None
     if "tagline" in data:

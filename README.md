@@ -78,6 +78,11 @@ prices remain unset until an admin configures them. Migration
 `008_seed_air_and_sea_cargo.sql` adds the Air Cargo and Sea Cargo descriptions,
 coverage and restrictions, and USA → India weight options. Those prices are
 stored in USD; no INR values are inferred.
+Migration `009_split_services_by_direction.sql` adds a direction to each
+service, creates separate India → USA service records from existing services,
+and copies their service details and pricing for independent admin editing.
+Review and set India → USA INR prices in Admin → Services before accepting
+bookings for those service records.
 
 ## Project structure
 

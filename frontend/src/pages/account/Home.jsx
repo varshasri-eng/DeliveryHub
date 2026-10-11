@@ -108,19 +108,33 @@ export default function Home() {
           <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
             Our Services
           </p>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-            {services.map((s) => (
-              <button
-                key={s.id}
-                onClick={() => navigate(`/services/${s.slug}`)}
-                className="bg-white border border-gray-100 rounded-xl p-4 text-center
-                           hover:border-brand-300 hover:shadow-sm transition-all"
-              >
-                <span className="text-2xl block mb-2">{s.icon || "📦"}</span>
-                <span className="text-sm font-medium text-gray-800">{s.name}</span>
-              </button>
-            ))}
-          </div>
+          {[
+            { id: "US_TO_IN", label: "United States → India" },
+            { id: "IN_TO_US", label: "India → United States" },
+          ].map((direction) => {
+            const directionServices = services.filter(
+              (service) => service.route_direction === direction.id,
+            );
+            if (directionServices.length === 0) return null;
+            return (
+              <div key={direction.id} className="mb-5 last:mb-0">
+                <p className="mb-2 text-sm font-semibold text-gray-700">{direction.label}</p>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                  {directionServices.map((service) => (
+                    <button
+                      key={service.id}
+                      onClick={() => navigate(`/services/${service.slug}`)}
+                      className="bg-white border border-gray-100 rounded-xl p-4 text-center
+                                 hover:border-brand-300 hover:shadow-sm transition-all"
+                    >
+                      <span className="text-2xl block mb-2">{service.icon || "📦"}</span>
+                      <span className="text-sm font-medium text-gray-800">{service.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
 
