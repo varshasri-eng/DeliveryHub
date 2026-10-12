@@ -4,7 +4,7 @@ import { formatMoney } from "../../utils/money";
 import { FiPackage, FiX } from "react-icons/fi";
 import {
   getAdminShipments, updateShipmentStatus,
-  raiseShipmentInvoice, verifyShipmentPayment, rejectShipmentPayment,
+  raiseShipmentInvoice, updateShipmentInvoice, verifyShipmentPayment, rejectShipmentPayment,
 } from "../../api/admin";
 
 const STATUS_OPTIONS = ["requested", "picked_up", "in_transit", "delivered", "cancelled"];
@@ -31,6 +31,7 @@ export default function AdminShipments() {
   const [loading, setLoading] = useState(true);
   const [tab, setTab] = useState("needs_invoice");
   const [selected, setSelected] = useState(null);
+  const [invoiceEditorShipment, setInvoiceEditorShipment] = useState(null);
 
   const load = () => {
     setLoading(true);
@@ -65,13 +66,20 @@ export default function AdminShipments() {
   };
 
   const handleRaiseInvoice = async (shipment) => {
+    setInvoiceEditorShipment({ shipment, invoice: null });
+  };
+
+  const handleSaveInvoice = async (shipment, invoice, draft) => {
     try {
-      const res = await raiseShipmentInvoice(shipment.id);
+      const res = invoice
+        ? await updateShipmentInvoice(invoice.id, draft)
+        : await raiseShipmentInvoice(shipment.id, draft);
       refreshOne({ ...shipment, invoice: res.data.invoice });
-      toast.success("Invoice raised.");
+      toast.success(invoice ? "Invoice updated." : "Invoice raised.");
       setTab("pending_payment");
+      setInvoiceEditorShipment(null);
     } catch (err) {
-      toast.error(err.response?.data?.error || "Could not raise invoice.");
+      toast.error(err.response?.data?.error || "Could not save invoice.");
     }
   };
 
@@ -166,7 +174,7 @@ export default function AdminShipments() {
                 {!s.invoice ? (
                   <button onClick={() => handleRaiseInvoice(s)}
                     className="px-3 py-1.5 rounded-lg bg-gray-900 text-white text-xs font-semibold hover:bg-gray-700">
-                    Raise Invoice
+                    Preview & Raise Invoice
                   </button>
                 ) : s.invoice.status === "payment_submitted" ? (
                   <div className="flex gap-2">
@@ -180,9 +188,17 @@ export default function AdminShipments() {
                     </button>
                   </div>
                 ) : (
-                  <span className="text-xs font-semibold text-gray-400 capitalize">
-                    {s.invoice.status.replace("_", " ")}
-                  </span>
+                  <div className="flex items-center gap-3">
+                    {s.invoice.status === "issued" && (
+                      <button onClick={() => setInvoiceEditorShipment({ shipment: s, invoice: s.invoice })}
+                        className="text-xs font-semibold text-brand-700 hover:underline">
+                        Preview / Edit Invoice
+                      </button>
+                    )}
+                    <span className="text-xs font-semibold text-gray-400 capitalize">
+                      {s.invoice.status.replace("_", " ")}
+                    </span>
+                  </div>
                 )}
               </div>
             </div>
@@ -193,6 +209,215 @@ export default function AdminShipments() {
       {selected && (
         <ShipmentDetailModal shipment={selected} onClose={() => setSelected(null)} />
       )}
+      {invoiceEditorShipment && (
+        <InvoiceEditorModal
+          shipment={invoiceEditorShipment.shipment}
+          invoice={invoiceEditorShipment.invoice}
+          onClose={() => setInvoiceEditorShipment(null)}
+          onSave={handleSaveInvoice}
+        />
+      )}
+    </div>
+  );
+}
+
+function InvoiceEditorModal({ shipment, invoice, onClose, onSave }) {
+  const existingItems = invoice?.items?.length
+    ? invoice.items
+    : [{
+        description: `${shipment.service_name} — ${shipment.tier_name}${
+          shipment.sub_service_name ? ` — ${shipment.sub_service_name}` : ""
+        }`,
+        quantity: shipment.quantity,
+        unit_price: shipment.unit_price,
+      }];
+  const [items, setItems] = useState(existingItems.map((item) => ({
+    description: item.description,
+    quantity: String(item.quantity),
+    unit_price: String(item.unit_price),
+  })));
+  const [discountType, setDiscountType] = useState(invoice?.manual_discount_type || "none");
+  const [discountValue, setDiscountValue] = useState(
+    invoice?.manual_discount_value ? String(invoice.manual_discount_value) : "",
+  );
+  const [saving, setSaving] = useState(false);
+  const currencyCode = shipment.currency_code || "USD";
+  const subtotal = items.reduce(
+    (sum, item) => sum + Math.max(0, Number(item.quantity) || 0) * Math.max(0, Number(item.unit_price) || 0),
+    0,
+  );
+  const offerDiscount = Number(invoice?.offer_discount_amount ?? shipment.offer_discount_amount ?? 0);
+  const afterOffer = Math.max(0, subtotal - offerDiscount);
+  const parsedDiscount = Math.max(0, Number(discountValue) || 0);
+  const manualDiscount = discountType === "percentage"
+    ? Math.round(afterOffer * Math.min(parsedDiscount, 100)) / 100
+    : discountType === "fixed"
+      ? parsedDiscount
+      : 0;
+  const total = afterOffer - manualDiscount;
+  const invalid = !items.length || items.some((item) => (
+    !item.description.trim() || Number(item.quantity) < 1 ||
+    !Number.isInteger(Number(item.quantity)) || Number(item.unit_price) < 0
+  )) || offerDiscount > subtotal || manualDiscount > afterOffer ||
+    (discountType === "percentage" && parsedDiscount > 100);
+
+  const save = async (event) => {
+    event.preventDefault();
+    if (invalid) {
+      toast.error("Check the invoice lines and discount amounts.");
+      return;
+    }
+    setSaving(true);
+    try {
+      await onSave(shipment, invoice, {
+        items: items.map((item) => ({
+          description: item.description.trim(),
+          quantity: Number(item.quantity),
+          unit_price: Number(item.unit_price),
+        })),
+        manual_discount_type: discountType,
+        manual_discount_value: discountType === "none" ? 0 : parsedDiscount,
+      });
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+      <form onSubmit={save}
+        className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-2xl bg-white shadow-2xl">
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-gray-100 bg-white px-6 py-4">
+          <div>
+            <h2 className="font-bold text-gray-900">
+              {invoice ? "Preview / Edit Invoice" : "Invoice Preview"}
+            </h2>
+            <p className="mt-0.5 text-xs text-gray-500">
+              {shipment.shipment_number}{invoice ? ` · ${invoice.invoice_number}` : ""}
+            </p>
+          </div>
+          <button type="button" onClick={onClose}
+            className="rounded-lg border border-gray-200 px-3 py-2 text-sm text-gray-600 hover:bg-gray-50">
+            Close
+          </button>
+        </div>
+
+        <div className="grid gap-6 p-6 lg:grid-cols-[1.2fr_0.8fr]">
+          <div className="space-y-4">
+            <div>
+              <div className="mb-2 flex items-center justify-between">
+                <h3 className="font-semibold text-gray-900">Invoice line items</h3>
+                <button type="button"
+                  disabled={items.length >= 10}
+                  onClick={() => setItems((current) => [...current, {
+                    description: "", quantity: "1", unit_price: "0.00",
+                  }])}
+                  className="text-xs font-semibold text-brand-700 hover:underline disabled:opacity-40">
+                  + Add line
+                </button>
+              </div>
+              <div className="space-y-3">
+                {items.map((item, index) => (
+                  <div key={index} className="grid gap-2 rounded-xl border border-gray-100 p-3 sm:grid-cols-[minmax(0,1fr)_80px_120px_auto]">
+                    <input aria-label="Line description" required maxLength={255}
+                      className="input" placeholder="Description" value={item.description}
+                      onChange={(event) => setItems((current) => current.map((line, i) => (
+                        i === index ? { ...line, description: event.target.value } : line
+                      )))} />
+                    <input aria-label="Quantity" required type="number" min="1" step="1"
+                      className="input" value={item.quantity}
+                      onChange={(event) => setItems((current) => current.map((line, i) => (
+                        i === index ? { ...line, quantity: event.target.value } : line
+                      )))} />
+                    <input aria-label="Unit price" required type="number" min="0" step="0.01"
+                      className="input" value={item.unit_price}
+                      onChange={(event) => setItems((current) => current.map((line, i) => (
+                        i === index ? { ...line, unit_price: event.target.value } : line
+                      )))} />
+                    <button type="button" disabled={items.length === 1}
+                      aria-label="Remove invoice line"
+                      onClick={() => setItems((current) => current.filter((_, i) => i !== index))}
+                      className="px-2 text-sm text-red-500 disabled:opacity-30">
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="rounded-xl border border-gray-100 p-4">
+              <h3 className="font-semibold text-gray-900">Additional admin discount</h3>
+              <p className="mb-3 mt-1 text-xs text-gray-500">
+                Separate from any customer offer code. Applied after the offer-code discount.
+              </p>
+              <div className="grid gap-2 sm:grid-cols-[1fr_1fr]">
+                <select className="input" value={discountType}
+                  onChange={(event) => {
+                    setDiscountType(event.target.value);
+                    if (event.target.value === "none") setDiscountValue("");
+                  }}>
+                  <option value="none">No additional discount</option>
+                  <option value="percentage">Percentage discount</option>
+                  <option value="fixed">Fixed amount discount</option>
+                </select>
+                {discountType !== "none" && (
+                  <input aria-label="Manual discount value" required type="number" min="0"
+                    max={discountType === "percentage" ? "100" : undefined} step="0.01"
+                    className="input"
+                    placeholder={discountType === "percentage" ? "Percent" : `Amount (${currencyCode})`}
+                    value={discountValue}
+                    onChange={(event) => setDiscountValue(event.target.value)} />
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="h-fit rounded-xl border border-gray-200 bg-gray-50 p-5">
+            <p className="text-xs font-bold uppercase tracking-wide text-gray-500">Invoice preview</p>
+            <p className="mt-1 font-bold text-gray-900">{shipment.service_name}</p>
+            <p className="text-xs text-gray-500">{shipment.sender_name} → {shipment.receiver_name}</p>
+            <div className="mt-5 space-y-2 border-t border-gray-200 pt-4 text-sm">
+              {items.map((item, index) => (
+                <div key={index} className="flex justify-between gap-3">
+                  <span className="text-gray-600">{item.description || "Invoice line"} × {item.quantity || 0}</span>
+                  <span className="font-medium text-gray-900">
+                    {formatMoney((Number(item.quantity) || 0) * (Number(item.unit_price) || 0), currencyCode)}
+                  </span>
+                </div>
+              ))}
+              <div className="flex justify-between border-t border-gray-200 pt-2">
+                <span>Subtotal</span><span>{formatMoney(subtotal, currencyCode)}</span>
+              </div>
+              {offerDiscount > 0 && (
+                <div className="flex justify-between text-green-700">
+                  <span>Offer code {invoice?.offer_code || shipment.offer_code || ""}</span>
+                  <span>−{formatMoney(offerDiscount, currencyCode)}</span>
+                </div>
+              )}
+              {manualDiscount > 0 && (
+                <div className="flex justify-between text-green-700">
+                  <span>Admin discount</span><span>−{formatMoney(manualDiscount, currencyCode)}</span>
+                </div>
+              )}
+              <div className="flex justify-between border-t-2 border-gray-300 pt-3 text-lg font-extrabold">
+                <span>Total</span><span>{formatMoney(total, currencyCode)}</span>
+              </div>
+            </div>
+            {invalid && (
+              <p role="alert" className="mt-3 text-xs text-red-600">
+                Discount must not exceed the invoice amount, and all lines need valid values.
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2 border-t border-gray-100 px-6 py-4">
+          <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
+          <button disabled={saving || invalid} className="btn-primary disabled:opacity-50">
+            {saving ? "Saving…" : invoice ? "Save Invoice" : "Raise Invoice"}
+          </button>
+        </div>
+      </form>
     </div>
   );
 }

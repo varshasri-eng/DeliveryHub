@@ -28,6 +28,11 @@ class Shipment(db.Model):
 
     quantity = db.Column(db.Integer, default=1)
     unit_price = db.Column(db.Numeric(10, 2), nullable=False)
+    subtotal_price = db.Column(db.Numeric(10, 2), nullable=False, default=0)
+    offer_code_id = db.Column(db.Integer, db.ForeignKey("offer_codes.id", ondelete="SET NULL"))
+    offer_code = db.Column(db.String(50))
+    offer_discount_percent = db.Column(db.Numeric(5, 2), nullable=False, default=0)
+    offer_discount_amount = db.Column(db.Numeric(10, 2), nullable=False, default=0)
     total_price = db.Column(db.Numeric(10, 2), nullable=False)
 
     sender_name = db.Column(db.String(255), nullable=False)
@@ -50,6 +55,7 @@ class Shipment(db.Model):
     service_type = db.relationship("ServiceType")
     pricing_tier = db.relationship("ServicePricingTier")
     sub_service = db.relationship("ServiceSubservice")
+    offer = db.relationship("OfferCode")
 
     def to_dict(self, include_invoice=True):
         data = {
@@ -66,6 +72,11 @@ class Shipment(db.Model):
             "sub_service_name": self.sub_service_name,
             "quantity": self.quantity,
             "unit_price": float(self.unit_price),
+            "subtotal_price": float(self.subtotal_price or self.total_price),
+            "offer_code_id": self.offer_code_id,
+            "offer_code": self.offer_code,
+            "offer_discount_percent": float(self.offer_discount_percent or 0),
+            "offer_discount_amount": float(self.offer_discount_amount or 0),
             "total_price": float(self.total_price),
             "sender_name": self.sender_name,
             "sender_phone": self.sender_phone,

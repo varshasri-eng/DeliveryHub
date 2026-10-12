@@ -42,8 +42,23 @@ export const updateShipmentStatus = (id, status) =>
   api.put(`/admin/shipments/${id}/status`, { status });
 
 // ── Invoice / billing ─────────────────────────────────────────
-export const raiseShipmentInvoice = (shipmentId) =>
-  api.post(`/admin/shipments/${shipmentId}/invoice`);
+export const raiseShipmentInvoice = (shipmentId, data) =>
+  api.post(`/admin/shipments/${shipmentId}/invoice`, data);
+
+export const updateShipmentInvoice = (invoiceId, data) =>
+  api.put(`/admin/shipments/invoices/${invoiceId}`, data);
+
+export const listOfferCodes = () =>
+  api.get("/admin/offer-codes");
+
+export const createOfferCode = (data) =>
+  api.post("/admin/offer-codes", data);
+
+export const updateOfferCode = (id, data) =>
+  api.put(`/admin/offer-codes/${id}`, data);
+
+export const deleteOfferCode = (id) =>
+  api.delete(`/admin/offer-codes/${id}`);
 
 export const verifyShipmentPayment = (invoiceId) =>
   api.put(`/admin/shipments/invoices/${invoiceId}/verify`);

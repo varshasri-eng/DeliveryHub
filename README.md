@@ -83,6 +83,10 @@ service, creates separate India → USA service records from existing services,
 and copies their service details and pricing for independent admin editing.
 Review and set India → USA INR prices in Admin → Services before accepting
 bookings for those service records.
+Migration `010_offer_codes_and_invoice_discounts.sql` adds admin-managed
+percentage offer codes, booking-time discount snapshots, and invoice subtotal,
+offer discount, and admin discount fields. Apply it before deploying the
+offer-code and invoice-editing features.
 
 ## Project structure
 

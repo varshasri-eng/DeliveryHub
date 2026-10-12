@@ -22,6 +22,7 @@ import os
 import re
 import secrets
 from datetime import datetime, timezone
+from decimal import Decimal, ROUND_HALF_UP
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -30,6 +31,7 @@ from werkzeug.utils import secure_filename
 from app import db
 from app.models.shipment import Shipment, generate_shipment_number
 from app.models.service_type import ServiceType, ServicePricingTier, ServiceSubservice
+from app.models.offer_code import OfferCode
 from app.utils.auth import login_required
 
 shipments_bp = Blueprint("shipments", __name__)
@@ -342,6 +344,125 @@ def _price_booking(tier, sub_service, quantity, currency_code):
     return unit_price, total_price
 
 
+def _money_decimal(value):
+    return Decimal(str(value)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+def _offer_pricing_context(data):
+    direction = data.get("route_direction")
+    if direction not in VALID_ROUTE_DIRECTIONS:
+        return None, "Choose a valid shipment direction."
+    try:
+        service_id = int(data.get("service_type_id"))
+        tier_id = int(data.get("pricing_tier_id"))
+        quantity = int(data.get("quantity", 1))
+        sub_service_id = data.get("sub_service_id")
+        sub_service_id = int(sub_service_id) if sub_service_id not in (None, "") else None
+    except (TypeError, ValueError):
+        return None, "Choose a valid shipping option."
+
+    service = ServiceType.query.filter_by(id=service_id, is_active=True).first()
+    if not service or service.route_direction != direction:
+        return None, "This service is not available for the selected shipment direction."
+    tier = ServicePricingTier.query.filter_by(
+        id=tier_id, service_type_id=service.id,
+    ).first()
+    if not tier:
+        return None, "Selected pricing tier does not belong to this service."
+    if not service.enable_quantity:
+        quantity = 1
+    elif quantity < 1:
+        return None, "Quantity must be a positive integer."
+
+    sub_service = None
+    if tier.sub_services:
+        if sub_service_id is None:
+            return None, "Choose a sub-service for this delivery option."
+        sub_service = ServiceSubservice.query.filter_by(
+            id=sub_service_id,
+            pricing_tier_id=tier.id,
+        ).first()
+        if not sub_service:
+            return None, "Selected sub-service does not belong to this delivery option."
+    elif sub_service_id is not None:
+        return None, "Selected sub-service does not belong to this delivery option."
+
+    currency_code = "INR" if direction == "IN_TO_US" else "USD"
+    selected_price = (
+        sub_service.price_inr if currency_code == "INR" else sub_service.price
+    ) if sub_service else (
+        tier.price_inr if currency_code == "INR" else tier.price
+    )
+    if selected_price is None:
+        return None, f"{currency_code} pricing is not set for this option yet."
+    unit_price, subtotal = _price_booking(tier, sub_service, quantity, currency_code)
+    return {
+        "currency_code": currency_code,
+        "quantity": quantity,
+        "unit_price": unit_price,
+        "subtotal": _money_decimal(subtotal),
+    }, None
+
+
+def _get_offer_discount(code, subtotal, reserve=False):
+    normalized_code = str(code or "").strip().upper()
+    if not normalized_code:
+        return None, Decimal("0.00"), Decimal("0.00"), None
+
+    query = OfferCode.query.filter(db.func.upper(OfferCode.code) == normalized_code)
+    if reserve:
+        query = query.with_for_update()
+    offer = query.first()
+    if not offer or not offer.is_active:
+        return None, None, None, "This offer code is invalid or inactive."
+
+    now = datetime.now(timezone.utc)
+    valid_from = offer.valid_from
+    valid_until = offer.valid_until
+    if valid_from and valid_from.tzinfo is None:
+        valid_from = valid_from.replace(tzinfo=timezone.utc)
+    if valid_until and valid_until.tzinfo is None:
+        valid_until = valid_until.replace(tzinfo=timezone.utc)
+    if valid_from and now < valid_from:
+        return None, None, None, "This offer code is not active yet."
+    if valid_until and now >= valid_until:
+        return None, None, None, "This offer code has expired."
+    if offer.max_uses is not None and offer.times_used >= offer.max_uses:
+        return None, None, None, "This offer code has reached its usage limit."
+
+    percent = Decimal(str(offer.discount_percent))
+    discount = _money_decimal(subtotal * percent / Decimal("100"))
+    discount = min(discount, subtotal)
+    if reserve:
+        offer.times_used += 1
+    return offer, percent, discount, None
+
+
+@shipments_bp.route("/offer-codes/validate", methods=["POST"])
+def validate_offer_code():
+    data = request.get_json(silent=True) or {}
+    if not str(data.get("offer_code") or "").strip():
+        return jsonify({"error": "Enter an offer code."}), 400
+    context, error = _offer_pricing_context(data)
+    if error:
+        return jsonify({"error": error}), 400
+    offer, percent, discount, error = _get_offer_discount(
+        data.get("offer_code"),
+        context["subtotal"],
+    )
+    if error:
+        return jsonify({"error": error}), 400
+    total = context["subtotal"] - discount
+    return jsonify({
+        "code": offer.code,
+        "discount_percent": float(percent),
+        "discount_amount": float(discount),
+        "subtotal_amount": float(context["subtotal"]),
+        "total_amount": float(total),
+        "currency_code": context["currency_code"],
+    }), 200
+
+
 # ── AUTHENTICATED ────────────────────────────────────────────
 @shipments_bp.route("", methods=["GET"])
 @login_required
@@ -383,6 +504,12 @@ def create_shipment(customer):
 
     currency_code = "INR" if route_direction == "IN_TO_US" else "USD"
     unit_price, total_price = _price_booking(tier, sub_service, quantity, currency_code)
+    subtotal_price = _money_decimal(total_price)
+    offer, offer_percent, offer_discount, offer_error = _get_offer_discount(
+        data.get("offer_code"), subtotal_price, reserve=True,
+    )
+    if offer_error:
+        return jsonify({"error": offer_error}), 400
 
     shipment = Shipment(
         shipment_number=generate_shipment_number(),
@@ -395,7 +522,12 @@ def create_shipment(customer):
         sub_service_name=sub_service.name if sub_service else None,
         quantity=quantity,
         unit_price=unit_price,
-        total_price=total_price,
+        subtotal_price=subtotal_price,
+        offer_code_id=offer.id if offer else None,
+        offer_code=offer.code if offer else None,
+        offer_discount_percent=offer_percent or Decimal("0.00"),
+        offer_discount_amount=offer_discount,
+        total_price=subtotal_price - offer_discount,
         sender_name=sender["name"],
         sender_phone=sender["phone"],
         sender_address=sender["address"],
@@ -437,6 +569,15 @@ def create_guest_shipment():
     if err:
         return err
 
+    currency_code = "INR" if route_direction == "IN_TO_US" else "USD"
+    unit_price, total_price = _price_booking(tier, sub_service, quantity, currency_code)
+    subtotal_price = _money_decimal(total_price)
+    offer, offer_percent, offer_discount, offer_error = _get_offer_discount(
+        data.get("offer_code"), subtotal_price, reserve=True,
+    )
+    if offer_error:
+        return jsonify({"error": offer_error}), 400
+
     customer = None
     if guest_email:
         customer = Customer.query.filter_by(email=guest_email).first()
@@ -454,9 +595,6 @@ def create_guest_shipment():
             db.session.add(customer)
             db.session.flush()
 
-    currency_code = "INR" if route_direction == "IN_TO_US" else "USD"
-    unit_price, total_price = _price_booking(tier, sub_service, quantity, currency_code)
-
     shipment = Shipment(
         shipment_number=generate_shipment_number(),
         customer_id=customer.id if customer else None,
@@ -468,7 +606,12 @@ def create_guest_shipment():
         sub_service_name=sub_service.name if sub_service else None,
         quantity=quantity,
         unit_price=unit_price,
-        total_price=total_price,
+        subtotal_price=subtotal_price,
+        offer_code_id=offer.id if offer else None,
+        offer_code=offer.code if offer else None,
+        offer_discount_percent=offer_percent or Decimal("0.00"),
+        offer_discount_amount=offer_discount,
+        total_price=subtotal_price - offer_discount,
         sender_name=sender["name"],
         sender_phone=sender["phone"],
         sender_address=sender["address"],

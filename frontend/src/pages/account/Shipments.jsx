@@ -343,25 +343,47 @@ function InvoiceModal({ shipment, paymentSettings, onClose, onPrint, onPaymentSu
                 </tr>
               </thead>
               <tbody>
-                <tr>
-                  <td className="p-3 text-sm font-medium border-b border-gray-100">
-                    {shipment.service_name} — {shipment.tier_name}
-                    {shipment.sub_service_name ? ` — ${shipment.sub_service_name}` : ""}
-                  </td>
-                  <td className="p-3 text-sm text-center border-b border-gray-100">{shipment.quantity}</td>
-                  <td className="p-3 text-sm text-right border-b border-gray-100">
-                    {formatMoney(shipment.unit_price, shipment.currency_code)}
-                  </td>
-                  <td className="p-3 text-sm text-right font-semibold border-b border-gray-100">
-                    {formatMoney(shipment.total_price, shipment.currency_code)}
-                  </td>
-                </tr>
+                {(invoice?.items?.length ? invoice.items : [{
+                  description: `${shipment.service_name} — ${shipment.tier_name}${
+                    shipment.sub_service_name ? ` — ${shipment.sub_service_name}` : ""
+                  }`,
+                  quantity: shipment.quantity,
+                  unit_price: shipment.unit_price,
+                  line_total: shipment.subtotal_price ?? shipment.total_price,
+                }]).map((item, index) => (
+                  <tr key={item.id || `${item.description}-${index}`}>
+                    <td className="p-3 text-sm font-medium border-b border-gray-100">{item.description}</td>
+                    <td className="p-3 text-sm text-center border-b border-gray-100">{item.quantity}</td>
+                    <td className="p-3 text-sm text-right border-b border-gray-100">
+                      {formatMoney(item.unit_price, shipment.currency_code)}
+                    </td>
+                    <td className="p-3 text-sm text-right font-semibold border-b border-gray-100">
+                      {formatMoney(item.line_total, shipment.currency_code)}
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
 
           <div className="flex justify-end mb-8">
-            <div className="w-72">
+            <div className="w-72 space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span>Subtotal</span>
+                <span>{formatMoney(invoice?.subtotal_amount ?? shipment.subtotal_price ?? shipment.total_price, shipment.currency_code)}</span>
+              </div>
+              {Number(invoice?.offer_discount_amount || 0) > 0 && (
+                <div className="flex justify-between text-green-700">
+                  <span>Offer code {invoice.offer_code}</span>
+                  <span>−{formatMoney(invoice.offer_discount_amount, shipment.currency_code)}</span>
+                </div>
+              )}
+              {Number(invoice?.manual_discount_amount || 0) > 0 && (
+                <div className="flex justify-between text-green-700">
+                  <span>Additional discount</span>
+                  <span>−{formatMoney(invoice.manual_discount_amount, shipment.currency_code)}</span>
+                </div>
+              )}
               <div className="flex justify-between pt-3 mt-2 border-t-2 border-gray-200 font-extrabold text-lg">
                 <span>Total</span>
                 <span>{formatMoney(total, shipment.currency_code)}</span>

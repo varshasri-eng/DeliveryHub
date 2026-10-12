@@ -27,6 +27,10 @@ export function downloadShipmentSummary(shipment) {
     ["Route", shipment.route_direction === "IN_TO_US"
       ? "India → United States"
       : "United States → India"],
+    ...(Number(shipment.offer_discount_amount || 0) > 0 ? [
+      ["Subtotal", formatMoney(shipment.subtotal_price, shipment.currency_code || "USD")],
+      [`Offer code ${shipment.offer_code || ""}`, `−${formatMoney(shipment.offer_discount_amount, shipment.currency_code || "USD")}`],
+    ] : []),
     ["Total", formatMoney(shipment.total_price, shipment.currency_code || "USD")],
   ];
   const details = rows.map(([label, value]) =>

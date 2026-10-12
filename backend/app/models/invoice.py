@@ -11,6 +11,12 @@ class Invoice(db.Model):
     invoice_number = db.Column(db.String(30), unique=True, nullable=False)
     shipment_id = db.Column(db.Integer, db.ForeignKey("shipments.id", ondelete="CASCADE"),
                             unique=True, nullable=False)
+    subtotal_amount = db.Column(db.Numeric(10, 2), nullable=False, default=0)
+    offer_code = db.Column(db.String(50))
+    offer_discount_amount = db.Column(db.Numeric(10, 2), nullable=False, default=0)
+    manual_discount_type = db.Column(db.String(20), nullable=False, default="none")
+    manual_discount_value = db.Column(db.Numeric(10, 2), nullable=False, default=0)
+    manual_discount_amount = db.Column(db.Numeric(10, 2), nullable=False, default=0)
     total_amount = db.Column(db.Numeric(10, 2), nullable=False, default=0)
     status = db.Column(db.String(20), nullable=False, default="issued")
     issued_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
@@ -33,6 +39,12 @@ class Invoice(db.Model):
             "id": self.id,
             "invoice_number": self.invoice_number,
             "shipment_id": self.shipment_id,
+            "subtotal_amount": float(self.subtotal_amount or 0),
+            "offer_code": self.offer_code,
+            "offer_discount_amount": float(self.offer_discount_amount or 0),
+            "manual_discount_type": self.manual_discount_type or "none",
+            "manual_discount_value": float(self.manual_discount_value or 0),
+            "manual_discount_amount": float(self.manual_discount_amount or 0),
             "total_amount": float(self.total_amount or 0),
             "status": self.status,
             "issued_at": self.issued_at.isoformat() if self.issued_at else None,

@@ -13,6 +13,9 @@ export const createShipment = (data) =>
 export const createGuestShipment = (data) =>
   api.post("/shipments/guest", data);
 
+export const validateOfferCode = (data) =>
+  api.post("/shipments/offer-codes/validate", data);
+
 export const trackShipment = (shipmentNumber) =>
   api.get(`/shipments/track/${encodeURIComponent(shipmentNumber)}`);
 

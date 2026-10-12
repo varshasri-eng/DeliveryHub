@@ -3,7 +3,7 @@ import { useParams, useSearchParams, Link } from "react-router-dom";
 import toast from "react-hot-toast";
 import { FiCheckCircle, FiMessageCircle, FiDownload } from "react-icons/fi";
 import { getService } from "../api/services";
-import { createShipment, createGuestShipment } from "../api/shipments";
+import { createShipment, createGuestShipment, validateOfferCode } from "../api/shipments";
 import { useAuth } from "../context/AuthContext";
 import { formatMoney } from "../utils/money";
 import { downloadShipmentSummary } from "../utils/shipmentSummary";
@@ -241,6 +241,9 @@ export default function BookShipmentPage() {
   const [sender, setSender] = useState(emptyParty());
   const [receiver, setReceiver] = useState(emptyParty());
   const [fieldValues, setFieldValues] = useState({});
+  const [offerCodeInput, setOfferCodeInput] = useState("");
+  const [appliedOffer, setAppliedOffer] = useState(null);
+  const [validatingOffer, setValidatingOffer] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [booked, setBooked] = useState(null);
@@ -359,6 +362,10 @@ export default function BookShipmentPage() {
     : tier?.[priceKey];
   const unitPrice = selectedPrice == null ? 0 : Number(selectedPrice);
   const total = unitPrice * effectiveQty;
+  const offerDiscount = appliedOffer
+    ? Math.round(total * appliedOffer.discount_percent) / 100
+    : 0;
+  const discountedTotal = Math.max(0, total - offerDiscount);
   const isDocumentService = service.name.trim().toLowerCase() === "document services" ||
     service.slug === "document-shipping";
   const fields = isDocumentService ? [] : service.fields || [];
@@ -384,6 +391,33 @@ export default function BookShipmentPage() {
   const summarySelectField = fields.find((f) => f.field_type === "select");
   const summaryDateField = fields.find((f) => f.field_type === "date");
   const selectedOpt = summarySelectField ? fieldValues[summarySelectField.field_key] : null;
+
+  const applyOfferCode = async () => {
+    const code = offerCodeInput.trim().toUpperCase();
+    if (!code) {
+      toast.error("Enter an offer code.");
+      return;
+    }
+    setValidatingOffer(true);
+    try {
+      const response = await validateOfferCode({
+        offer_code: code,
+        route_direction: direction,
+        service_type_id: service.id,
+        pricing_tier_id: tier.id,
+        sub_service_id: subservice?.id ?? null,
+        quantity: effectiveQty,
+      });
+      setOfferCodeInput(response.data.code);
+      setAppliedOffer(response.data);
+      toast.success(`${response.data.discount_percent}% offer applied.`);
+    } catch (error) {
+      setAppliedOffer(null);
+      toast.error(error.response?.data?.error || "Could not validate this offer code.");
+    } finally {
+      setValidatingOffer(false);
+    }
+  };
 
   const submit = async (e) => {
     e.preventDefault();
@@ -416,6 +450,7 @@ export default function BookShipmentPage() {
       receiver_address: formatAddress(receiver, route.to),
       field_values: fieldValues,
       notes: "",
+      ...(appliedOffer ? { offer_code: appliedOffer.code } : {}),
     };
 
     try {
@@ -455,7 +490,19 @@ export default function BookShipmentPage() {
             <p className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-1">Order summary</p>
             <p className="font-semibold text-gray-900">{booked.service_name} — {booked.tier_name}</p>
             {booked.sub_service_name && <p className="text-gray-600">{booked.sub_service_name}</p>}
-            <p className="mt-1 text-gray-600">{money(booked.total_price, booked.currency_code)}</p>
+            {Number(booked.offer_discount_amount || 0) > 0 && (
+              <>
+                <p className="mt-1 text-gray-500">
+                  Subtotal: {money(booked.subtotal_price, booked.currency_code)}
+                </p>
+                <p className="text-green-700">
+                  {booked.offer_code} discount: −{money(booked.offer_discount_amount, booked.currency_code)}
+                </p>
+              </>
+            )}
+            <p className="mt-1 font-semibold text-gray-900">
+              Total: {money(booked.total_price, booked.currency_code)}
+            </p>
             <p className="mt-1 text-gray-500">Booked {new Date(booked.created_at).toLocaleString()}</p>
           </div>
           <div>
@@ -567,10 +614,40 @@ export default function BookShipmentPage() {
                 </span>
               </div>
             )}
+            <div className="border-t border-gray-100 pt-2">
+              <label htmlFor="offer-code" className="mb-1 block text-xs font-semibold text-gray-600">
+                Offer code
+              </label>
+              <div className="flex gap-1.5">
+                <input id="offer-code" value={offerCodeInput}
+                  onChange={(event) => {
+                    setOfferCodeInput(event.target.value.toUpperCase());
+                    setAppliedOffer(null);
+                  }}
+                  placeholder="Enter code"
+                  className="min-w-0 flex-1 rounded-lg border border-gray-200 px-2 py-1.5 text-xs uppercase" />
+                <button type="button" onClick={applyOfferCode}
+                  disabled={validatingOffer || !tier || selectedPrice == null}
+                  className="rounded-lg border border-brand-200 px-2 py-1.5 text-xs font-semibold text-brand-700 disabled:opacity-50">
+                  {validatingOffer ? "Checking…" : "Apply"}
+                </button>
+              </div>
+              {appliedOffer && (
+                <p className="mt-1 text-xs font-semibold text-green-700">
+                  {appliedOffer.code} applied ({appliedOffer.discount_percent}% off)
+                </p>
+              )}
+            </div>
+            {appliedOffer && (
+              <div className="flex justify-between text-green-700">
+                <span>Offer discount</span>
+                <span>−{money(offerDiscount, currencyCode)}</span>
+              </div>
+            )}
             <div className="flex justify-between">
               <span className="text-gray-400">Total</span>
               <span className="text-gray-900 font-extrabold">
-                {selectedPrice == null ? `${currencyCode} price not set` : money(total, currencyCode)}
+                {selectedPrice == null ? `${currencyCode} price not set` : money(discountedTotal, currencyCode)}
               </span>
             </div>
           </div>

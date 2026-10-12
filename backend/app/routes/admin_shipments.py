@@ -13,6 +13,7 @@ PUT  /api/admin/invoices/<id>/reject            - mark payment rejected (with re
 """
 
 from datetime import datetime, timezone
+from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
 from flask import Blueprint, request, jsonify
 from app import db
@@ -27,6 +28,100 @@ def _generate_invoice_number():
     last = Invoice.query.order_by(Invoice.id.desc()).first()
     next_id = (last.id + 1) if last else 1
     return f"INV-{10000 + next_id}"
+
+
+def _parse_invoice_draft(shipment, data):
+    raw_items = data.get("items")
+    if not isinstance(raw_items, list) or not raw_items or len(raw_items) > 10:
+        return None, "Invoice must contain between 1 and 10 line items."
+
+    items = []
+    subtotal = Decimal("0.00")
+    for raw_item in raw_items:
+        if not isinstance(raw_item, dict):
+            return None, "Each invoice line item must be an object."
+        description = str(raw_item.get("description") or "").strip()
+        if not description or len(description) > 255:
+            return None, "Each invoice line needs a description of at most 255 characters."
+        try:
+            quantity = int(raw_item.get("quantity"))
+            unit_price = Decimal(str(raw_item.get("unit_price")))
+        except (TypeError, ValueError, InvalidOperation):
+            return None, "Enter a valid quantity and unit price for each invoice line."
+        if quantity < 1 or not unit_price.is_finite() or unit_price < 0:
+            return None, "Invoice quantity must be positive and unit price cannot be negative."
+        if unit_price > Decimal("99999999.99"):
+            return None, "Invoice unit price exceeds the supported limit."
+        line_total = (unit_price * quantity).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP,
+        )
+        if line_total > Decimal("99999999.99"):
+            return None, "Invoice line total exceeds the supported limit."
+        items.append({
+            "description": description,
+            "quantity": quantity,
+            "unit_price": unit_price,
+            "line_total": line_total,
+        })
+        subtotal += line_total
+    subtotal = subtotal.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    if subtotal > Decimal("99999999.99"):
+        return None, "Invoice subtotal exceeds the supported limit."
+
+    offer_discount = Decimal(str(shipment.offer_discount_amount or 0)).quantize(
+        Decimal("0.01"), rounding=ROUND_HALF_UP,
+    )
+    if offer_discount > subtotal:
+        return None, "Invoice subtotal cannot be less than the applied offer-code discount."
+
+    discount_type = data.get("manual_discount_type", "none")
+    if discount_type not in {"none", "percentage", "fixed"}:
+        return None, "Manual discount must be none, percentage, or fixed."
+    try:
+        discount_value = Decimal(str(data.get("manual_discount_value", 0)))
+    except (TypeError, ValueError, InvalidOperation):
+        return None, "Enter a valid manual discount."
+    if not discount_value.is_finite() or discount_value < 0:
+        return None, "Manual discount cannot be negative."
+    discount_base = subtotal - offer_discount
+    if discount_type == "none":
+        discount_value = Decimal("0.00")
+        manual_discount = Decimal("0.00")
+    elif discount_type == "percentage":
+        if discount_value > 100:
+            return None, "Percentage discount cannot exceed 100%."
+        manual_discount = (discount_base * discount_value / 100).quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP,
+        )
+    else:
+        manual_discount = discount_value.quantize(
+            Decimal("0.01"), rounding=ROUND_HALF_UP,
+        )
+        if manual_discount > discount_base:
+            return None, "Fixed discount cannot be greater than the amount remaining after the offer code."
+
+    return {
+        "items": items,
+        "subtotal_amount": subtotal,
+        "offer_discount_amount": offer_discount,
+        "manual_discount_type": discount_type,
+        "manual_discount_value": discount_value,
+        "manual_discount_amount": manual_discount,
+        "total_amount": subtotal - offer_discount - manual_discount,
+    }, None
+
+
+def _replace_invoice_items(invoice, item_values):
+    invoice.items.clear()
+    invoice.items.extend(
+        InvoiceItem(
+            description=item["description"],
+            quantity=item["quantity"],
+            unit_price=item["unit_price"],
+            line_total=item["line_total"],
+        )
+        for item in item_values
+    )
 
 
 # ── SHIPMENTS ────────────────────────────────────────────────
@@ -83,25 +178,65 @@ def raise_invoice(customer, shipment_id):
     if shipment.invoice:
         return jsonify({"error": "This shipment already has an invoice."}), 409
 
+    data = request.get_json(silent=True) or {}
+    if "items" not in data:
+        data["items"] = [{
+            "description": (
+                f"{shipment.service_type.name} — {shipment.pricing_tier.tier_name}"
+                f"{' — ' + shipment.sub_service_name if shipment.sub_service_name else ''}"
+            ),
+            "quantity": shipment.quantity,
+            "unit_price": float(shipment.unit_price),
+        }]
+    values, error = _parse_invoice_draft(shipment, data)
+    if error:
+        return jsonify({"error": error}), 400
+
     invoice = Invoice(
         invoice_number=_generate_invoice_number(),
         shipment_id=shipment.id,
-        total_amount=shipment.total_price,
+        subtotal_amount=values["subtotal_amount"],
+        offer_code=shipment.offer_code,
+        offer_discount_amount=values["offer_discount_amount"],
+        manual_discount_type=values["manual_discount_type"],
+        manual_discount_value=values["manual_discount_value"],
+        manual_discount_amount=values["manual_discount_amount"],
+        total_amount=values["total_amount"],
         status="issued",
     )
     db.session.add(invoice)
     db.session.flush()
-
-    db.session.add(InvoiceItem(
-        invoice_id=invoice.id,
-        description=f"{shipment.service_type.name} — {shipment.pricing_tier.tier_name}",
-        quantity=shipment.quantity,
-        unit_price=shipment.unit_price,
-        line_total=shipment.total_price,
-    ))
+    _replace_invoice_items(invoice, values["items"])
     db.session.commit()
 
     return jsonify({"message": "Invoice raised.", "invoice": invoice.to_dict()}), 201
+
+
+@admin_shipments_bp.route("/invoices/<int:invoice_id>", methods=["PUT"])
+@permission_required("write")
+def update_invoice(customer, invoice_id):
+    invoice = Invoice.query.get(invoice_id)
+    if not invoice:
+        return jsonify({"error": "Invoice not found."}), 404
+    if invoice.status != "issued":
+        return jsonify({
+            "error": "Invoices cannot be edited after payment proof has been submitted or verified.",
+        }), 409
+
+    data = request.get_json(silent=True) or {}
+    values, error = _parse_invoice_draft(invoice.shipment, data)
+    if error:
+        return jsonify({"error": error}), 400
+
+    invoice.subtotal_amount = values["subtotal_amount"]
+    invoice.offer_discount_amount = values["offer_discount_amount"]
+    invoice.manual_discount_type = values["manual_discount_type"]
+    invoice.manual_discount_value = values["manual_discount_value"]
+    invoice.manual_discount_amount = values["manual_discount_amount"]
+    invoice.total_amount = values["total_amount"]
+    _replace_invoice_items(invoice, values["items"])
+    db.session.commit()
+    return jsonify({"message": "Invoice updated.", "invoice": invoice.to_dict()}), 200
 
 
 @admin_shipments_bp.route("/invoices/<int:invoice_id>/verify", methods=["PUT"])

@@ -7,6 +7,7 @@ from app.models.reset_token import PasswordResetToken
 from app.models.site_settings import SiteSettings
 from app.models.payment_settings import PaymentSettings
 from app.models.static_page import StaticPage
+from app.models.offer_code import OfferCode
 
 from app.models.service_type import (
     ServiceType,
