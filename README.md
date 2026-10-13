@@ -90,7 +90,9 @@ offer-code and invoice-editing features.
 Migration `011_static_page_layouts_about_faq.sql` adds selectable static-page
 layouts and seeds original DeliveryHub About Us and FAQ pages. FAQ entries use
 Markdown level-three headings (`###`) for expandable questions. Admins can edit
-the page type and preview the rendered layout before saving.
+the page type and preview the rendered layout before saving. Published About Us
+and FAQ content is shown as sections on the landing page; the footer links and
+the corresponding `/pages/` URLs take visitors to those landing-page sections.
 
 ## Project structure
 

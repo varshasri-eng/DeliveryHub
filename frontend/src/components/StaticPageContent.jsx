@@ -44,10 +44,39 @@ function parseFaqSections(content) {
   return { introduction, questions };
 }
 
-export default function StaticPageContent({ page }) {
+export default function StaticPageContent({ page, embedded = false }) {
   const pageType = PAGE_TYPES[page.page_type] ? page.page_type : "standard";
   const { label, icon: PageIcon } = PAGE_TYPES[pageType];
   const components = markdownComponents();
+
+  if (embedded) {
+    return (
+      <section
+        id={pageType === "about" ? "about-us" : pageType === "faq" ? "faqs" : undefined}
+        className="scroll-mt-24 py-14 sm:py-16"
+      >
+        <div className="mx-auto max-w-6xl px-4 sm:px-6">
+          <header className="mb-7 max-w-3xl">
+            <div className="mb-3 inline-flex items-center gap-2 rounded-full bg-brand-50 px-3 py-1.5 text-xs font-semibold text-brand-700">
+              <PageIcon size={14} /> {label}
+            </div>
+            <h2 className="text-2xl font-bold tracking-tight text-gray-900 sm:text-3xl">
+              {page.title}
+            </h2>
+          </header>
+          {pageType === "faq" ? (
+            <FaqContent content={page.content} components={components} />
+          ) : (
+            <div className="rounded-2xl border border-gray-100 bg-white px-6 py-7 shadow-sm sm:px-10 sm:py-9">
+              <div className="static-page-prose max-w-3xl">
+                <ReactMarkdown components={components}>{page.content || ""}</ReactMarkdown>
+              </div>
+            </div>
+          )}
+        </div>
+      </section>
+    );
+  }
 
   return (
     <article className="mx-auto max-w-5xl px-4 py-10 sm:px-6 sm:py-14">

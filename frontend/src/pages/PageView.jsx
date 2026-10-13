@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams, Link, Navigate } from "react-router-dom";
 import api from "../api/client";
 import StaticPageContent from "../components/StaticPageContent";
 
@@ -28,6 +28,13 @@ export default function PageView() {
 
   if (!page) {
     return <div className="max-w-3xl mx-auto px-4 py-16 text-gray-400">Loading…</div>;
+  }
+
+  if (page.page_type === "about") {
+    return <Navigate to="/#about-us" replace />;
+  }
+  if (page.page_type === "faq") {
+    return <Navigate to="/#faqs" replace />;
   }
 
   return (

@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 import { FiArrowRight, FiCheckCircle, FiClock, FiPackage, FiShield, FiTruck } from "react-icons/fi";
 import { getServices } from "../api/services";
+import api from "../api/client";
+import StaticPageContent from "../components/StaticPageContent";
 import { useBranding } from "../context/BrandingContext";
 
 const DIRECTIONS = [
@@ -34,16 +36,44 @@ const FEATURES = [
 
 export default function LandingPage() {
   const navigate = useNavigate();
+  const { hash } = useLocation();
   const { settings } = useBranding();
   const [services, setServices] = useState([]);
   const [serviceLoadError, setServiceLoadError] = useState(false);
   const [direction, setDirection] = useState("");
+  const [staticPages, setStaticPages] = useState({ about: null, faq: null });
+  const [staticPagesLoading, setStaticPagesLoading] = useState(true);
 
   useEffect(() => {
     getServices()
       .then((response) => setServices(response.data.services || []))
       .catch(() => setServiceLoadError(true));
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    Promise.allSettled([
+      api.get("/pages/about-us"),
+      api.get("/pages/faqs"),
+    ]).then(([aboutResult, faqResult]) => {
+      if (!active) return;
+      setStaticPages({
+        about: aboutResult.status === "fulfilled" ? aboutResult.value.data.page : null,
+        faq: faqResult.status === "fulfilled" ? faqResult.value.data.page : null,
+      });
+      setStaticPagesLoading(false);
+    });
+    return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    if (staticPagesLoading || !hash) return;
+    const sectionId = decodeURIComponent(hash.slice(1));
+    if (sectionId !== "about-us" && sectionId !== "faqs") return;
+    requestAnimationFrame(() => {
+      document.getElementById(sectionId)?.scrollIntoView({ behavior: "smooth" });
+    });
+  }, [hash, staticPagesLoading]);
 
   const availableServices = services.filter((service) => service.route_direction === direction);
 
@@ -190,6 +220,38 @@ export default function LandingPage() {
           </div>
         </div>
       </section>
+
+      {staticPagesLoading ? (
+        <div className="mx-auto max-w-6xl space-y-4 px-4 py-14 sm:px-6">
+          <div className="h-7 w-48 animate-pulse rounded bg-gray-100" />
+          <div className="h-24 animate-pulse rounded-2xl bg-gray-50" />
+        </div>
+      ) : (
+        <>
+          {staticPages.about ? (
+            <StaticPageContent page={staticPages.about} embedded />
+          ) : (
+            <section id="about-us" className="scroll-mt-24 py-14 sm:py-16">
+              <div className="mx-auto max-w-6xl px-4 sm:px-6">
+                <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                  About information is temporarily unavailable.
+                </p>
+              </div>
+            </section>
+          )}
+          {staticPages.faq ? (
+            <StaticPageContent page={staticPages.faq} embedded />
+          ) : (
+            <section id="faqs" className="scroll-mt-24 bg-gray-50 py-14 sm:py-16">
+              <div className="mx-auto max-w-6xl px-4 sm:px-6">
+                <p role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+                  Frequently asked questions are temporarily unavailable.
+                </p>
+              </div>
+            </section>
+          )}
+        </>
+      )}
     </div>
   );
 }
