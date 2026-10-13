@@ -1,14 +1,22 @@
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import api from "../../api/client";
+import StaticPageContent from "../../components/StaticPageContent";
 
 const emptyForm = {
   id: null,
   title: "",
   slug: "",
   content: "",
+  page_type: "standard",
   is_published: true,
   display_order: 0,
+};
+
+const PAGE_TYPE_LABELS = {
+  standard: "Information",
+  about: "About Us",
+  faq: "FAQ",
 };
 
 export default function AdminPages() {
@@ -17,6 +25,7 @@ export default function AdminPages() {
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState(null); // null = list view; object = editor
   const [form, setForm] = useState(emptyForm);
+  const [editorTab, setEditorTab] = useState("edit");
 
   const loadPages = () => {
     setLoading(true);
@@ -33,6 +42,7 @@ export default function AdminPages() {
 
   const startCreate = () => {
     setForm(emptyForm);
+    setEditorTab("edit");
     setEditing("new");
   };
 
@@ -42,9 +52,11 @@ export default function AdminPages() {
       title: page.title,
       slug: page.slug,
       content: page.content || "",
+      page_type: page.page_type || "standard",
       is_published: page.is_published,
       display_order: page.display_order,
     });
+    setEditorTab("edit");
     setEditing(page.id);
   };
 
@@ -122,15 +134,52 @@ export default function AdminPages() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Content (Markdown supported: **bold**, *italic*, # Heading, - list, [link](url))
-            </label>
-            <textarea
-              className="input min-h-[240px] font-mono text-sm"
-              value={form.content}
-              onChange={(e) => setForm({ ...form, content: e.target.value })}
-              placeholder="Write the page content here..."
-            />
+            <label className="block text-sm font-medium text-gray-700 mb-1">Page layout</label>
+            <select className="input" value={form.page_type}
+              onChange={(e) => setForm({ ...form, page_type: e.target.value })}>
+              <option value="standard">Information page</option>
+              <option value="about">About Us</option>
+              <option value="faq">FAQ (expandable questions)</option>
+            </select>
+          </div>
+
+          <div>
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <label className="block text-sm font-medium text-gray-700">
+                Page content (Markdown)
+              </label>
+              <div className="flex rounded-lg border border-gray-200 p-0.5 text-xs">
+                {["edit", "preview"].map((tab) => (
+                  <button key={tab} type="button" onClick={() => setEditorTab(tab)}
+                    className={`rounded-md px-3 py-1.5 font-semibold capitalize ${
+                      editorTab === tab ? "bg-gray-900 text-white" : "text-gray-500 hover:text-gray-900"
+                    }`}>
+                    {tab}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {editorTab === "edit" ? (
+              <>
+                <textarea
+                  className="input min-h-[300px] font-mono text-sm"
+                  value={form.content}
+                  onChange={(e) => setForm({ ...form, content: e.target.value })}
+                  placeholder={form.page_type === "faq"
+                    ? "### How do I book a shipment?\n\nChoose a direction, service, and delivery option..."
+                    : "Write original page content here..."}
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  {form.page_type === "faq"
+                    ? "Use ### before each question. Text below it becomes the expandable answer."
+                    : "Use ## for section headings, **bold** for emphasis, and - for lists."}
+                </p>
+              </>
+            ) : (
+              <div className="max-h-[560px] overflow-y-auto rounded-xl border border-gray-200 bg-gray-50">
+                <StaticPageContent page={form} />
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-3">
@@ -197,6 +246,9 @@ export default function AdminPages() {
               <div>
                 <div className="font-medium text-gray-900">
                   {p.title}
+                  <span className="ml-2 rounded-full bg-brand-50 px-2 py-0.5 text-xs font-semibold text-brand-700">
+                    {PAGE_TYPE_LABELS[p.page_type] || PAGE_TYPE_LABELS.standard}
+                  </span>
                   {!p.is_published && (
                     <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-500">
                       Draft

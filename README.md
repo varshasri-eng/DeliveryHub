@@ -87,6 +87,10 @@ Migration `010_offer_codes_and_invoice_discounts.sql` adds admin-managed
 percentage offer codes, booking-time discount snapshots, and invoice subtotal,
 offer discount, and admin discount fields. Apply it before deploying the
 offer-code and invoice-editing features.
+Migration `011_static_page_layouts_about_faq.sql` adds selectable static-page
+layouts and seeds original DeliveryHub About Us and FAQ pages. FAQ entries use
+Markdown level-three headings (`###`) for expandable questions. Admins can edit
+the page type and preview the rendered layout before saving.
 
 ## Project structure
 

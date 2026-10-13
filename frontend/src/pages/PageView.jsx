@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import ReactMarkdown from "react-markdown";
 import api from "../api/client";
+import StaticPageContent from "../components/StaticPageContent";
 
 export default function PageView() {
   const { slug } = useParams();
@@ -31,11 +31,6 @@ export default function PageView() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-4 py-12">
-      <h1 className="text-3xl font-bold text-gray-900 mb-6">{page.title}</h1>
-      <div className="prose max-w-none">
-        <ReactMarkdown>{page.content || ""}</ReactMarkdown>
-      </div>
-    </div>
+    <StaticPageContent page={page} />
   );
 }

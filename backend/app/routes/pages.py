@@ -18,6 +18,7 @@ from app.utils.auth import permission_required
 
 pages_bp = Blueprint("pages", __name__)
 admin_pages_bp = Blueprint("admin_pages", __name__)
+VALID_PAGE_TYPES = {"standard", "about", "faq"}
 
 
 def _slugify(value):
@@ -70,9 +71,12 @@ def create_page(customer):
         slug=slug,
         title=title,
         content=data.get("content") or "",
+        page_type=data.get("page_type") or "standard",
         is_published=bool(data.get("is_published", True)),
         display_order=int(data.get("display_order") or 0),
     )
+    if page.page_type not in VALID_PAGE_TYPES:
+        return jsonify({"error": "Page type must be standard, about, or faq."}), 400
     db.session.add(page)
     db.session.commit()
     return jsonify({"message": "Page created.", "page": page.to_dict()}), 201
@@ -98,6 +102,10 @@ def update_page(customer, page_id):
         page.slug = new_slug
     if "content" in data:
         page.content = data["content"]
+    if "page_type" in data:
+        if data["page_type"] not in VALID_PAGE_TYPES:
+            return jsonify({"error": "Page type must be standard, about, or faq."}), 400
+        page.page_type = data["page_type"]
     if "is_published" in data:
         page.is_published = bool(data["is_published"])
     if "display_order" in data:
