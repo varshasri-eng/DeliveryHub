@@ -289,8 +289,13 @@ def _validate_booking(data):
     # ── service-specific fields — every configured field is required ──
     submitted_values = data.get("field_values") or {}
     field_values = {}
-    is_document_service = service.slug in {"document-services", "document-shipping"}
-    booking_fields = [] if is_document_service else service.fields
+    is_document_service = (
+        service.name.strip().casefold() == "document services"
+        or service.slug == "document-shipping"
+    )
+    booking_fields = [] if is_document_service else [
+        field for field in service.fields if field.field_key != "extra_notes"
+    ]
 
     for field in booking_fields:
         value = submitted_values.get(field.field_key)

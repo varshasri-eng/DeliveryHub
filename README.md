@@ -93,6 +93,8 @@ Markdown level-three headings (`###`) for expandable questions. Admins can edit
 the page type and preview the rendered layout before saving. Published About Us
 and FAQ content is shown as sections on the landing page; the footer links and
 the corresponding `/pages/` URLs take visitors to those landing-page sections.
+Migration `012_remove_admin_notes_service_fields.sql` removes the legacy
+"Anything else the admin should know?" booking field from every service.
 
 ## Project structure
 

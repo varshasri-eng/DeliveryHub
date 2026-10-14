@@ -53,7 +53,11 @@ class ServiceType(db.Model):
             data["coverage_items"] = [c.to_dict() for c in self.coverage_items]
             data["restrictions"] = [r.to_dict() for r in self.restrictions]
             data["pricing_tiers"] = [t.to_dict() for t in self.pricing_tiers]
-            data["fields"] = [f.to_dict() for f in self.fields]
+            data["fields"] = [
+                field.to_dict()
+                for field in self.fields
+                if field.field_key != "extra_notes"
+            ]
         return data
 
 

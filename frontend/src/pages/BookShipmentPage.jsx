@@ -368,7 +368,10 @@ export default function BookShipmentPage() {
   const discountedTotal = Math.max(0, total - offerDiscount);
   const isDocumentService = service.name.trim().toLowerCase() === "document services" ||
     service.slug === "document-shipping";
-  const fields = isDocumentService ? [] : service.fields || [];
+  const configuredFields = (service.fields || []).filter(
+    (field) => field.field_key !== "extra_notes"
+  );
+  const fields = isDocumentService ? [] : configuredFields;
   const shortName = service.name.replace(/\s+services?$/i, "");
 
   const setField = (key, value) => setFieldValues((prev) => ({ ...prev, [key]: value }));
