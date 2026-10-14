@@ -99,7 +99,8 @@ function PartyCard({
         <div className={compact ? "grid grid-cols-2 gap-2" : ""}>
           <div>
           <label className="label">Full name *</label>
-          <input id={`${who}-name`} name={`${who}_name`} className={cls("name")}
+          <input id={`${who}-name`} name={`${who}_name`}
+            autoComplete={`section-${who} name`} className={cls("name")}
             placeholder={who === "sender" ? "Sender name" : "Recipient name"}
             value={value.name} onChange={set("name")} onBlur={blur("name")} />
           <Err show={show("name")} msg={errors.name} />
@@ -109,7 +110,8 @@ function PartyCard({
           <label className="label">Phone *</label>
           <div className="grid grid-cols-[72px_1fr] gap-2">
             <span className="input flex items-center justify-center text-gray-500">+{country.phoneCode}</span>
-            <input id={`${who}-phone`} name={`${who}_phone`} className={cls("phone")}
+            <input id={`${who}-phone`} name={`${who}_phone`}
+              autoComplete={`section-${who} tel`} className={cls("phone")}
               placeholder={country.name === "India" ? "10-digit mobile number" : "10-digit U.S. number"}
               inputMode="tel"
               value={value.phone} onChange={set("phone")} onBlur={blur("phone")} />
@@ -126,6 +128,7 @@ function PartyCard({
           <div>
             <label className="label">{country.postalLabel} *</label>
             <input id={`${who}-postalCode`} name={`${who}_postalCode`}
+              autoComplete={`section-${who} shipping postal-code`}
               className={cls("postalCode")} placeholder={country.postalPlaceholder}
               inputMode={country.name === "India" ? "numeric" : "text"}
               value={value.postalCode} onChange={set("postalCode")} onBlur={blur("postalCode")} />
@@ -136,7 +139,7 @@ function PartyCard({
         <div>
           <label className="label">Street address *</label>
           <input id={`${who}-street`} name={`${who}_street`}
-            autoComplete={`section-${who} street-address`}
+            autoComplete={`section-${who} shipping address-line1`}
             className={cls("street")} placeholder="Building, street, unit"
             value={value.street} onChange={set("street")} onBlur={blur("street")} />
           <Err show={show("street")} msg={errors.street} />
@@ -145,13 +148,16 @@ function PartyCard({
         <div className="grid grid-cols-2 gap-2">
           <div>
             <label className="label">City *</label>
-            <input id={`${who}-city`} name={`${who}_city`} className={cls("city")} placeholder="City"
+            <input id={`${who}-city`} name={`${who}_city`}
+              autoComplete={`section-${who} shipping address-level2`}
+              className={cls("city")} placeholder="City"
               value={value.city} onChange={set("city")} onBlur={blur("city")} />
             <Err show={show("city")} msg={errors.city} />
           </div>
           <div>
             <label className="label">Province / state *</label>
             <input id={`${who}-province`} name={`${who}_province`}
+              autoComplete={`section-${who} shipping address-level1`}
               className={cls("province")} placeholder="Province or state"
               value={value.province} onChange={set("province")} onBlur={blur("province")} />
             <Err show={show("province")} msg={errors.province} />
