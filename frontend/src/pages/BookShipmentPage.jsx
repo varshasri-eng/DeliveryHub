@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
 import toast from "react-hot-toast";
-import { FiCheckCircle, FiMessageCircle, FiDownload } from "react-icons/fi";
+import { FiCheckCircle, FiDownload } from "react-icons/fi";
 import { getService } from "../api/services";
 import { createShipment, createGuestShipment, validateOfferCode } from "../api/shipments";
 import { useAuth } from "../context/AuthContext";
@@ -9,7 +9,6 @@ import { formatMoney } from "../utils/money";
 import { downloadShipmentSummary } from "../utils/shipmentSummary";
 
 const money = (n, currencyCode) => formatMoney(n, currencyCode);
-const WHATSAPP_NUMBER = "15107146946";
 
 const DIRECTIONS = {
   US_TO_IN: {
@@ -75,7 +74,7 @@ function PartyCard({
   letter, title, subtitle, who, value, onChange, errors, showErrors, country, compact = false,
 }) {
   const [touched, setTouched] = useState({});
-  const set = (k) => (e) => onChange({ ...value, [k]: e.target.value });
+  const set = (key) => (event) => onChange(key, event.target.value);
   const blur = (k) => () => setTouched((t) => ({ ...t, [k]: true }));
   const show = (k) => (showErrors || touched[k]) && errors[k];
   const cls = (k) => `input ${show(k) ? "border-red-400" : ""}`;
@@ -100,7 +99,8 @@ function PartyCard({
         <div className={compact ? "grid grid-cols-2 gap-2" : ""}>
           <div>
           <label className="label">Full name *</label>
-          <input className={cls("name")} placeholder={who === "sender" ? "Sender name" : "Recipient name"}
+          <input id={`${who}-name`} name={`${who}_name`} className={cls("name")}
+            placeholder={who === "sender" ? "Sender name" : "Recipient name"}
             value={value.name} onChange={set("name")} onBlur={blur("name")} />
           <Err show={show("name")} msg={errors.name} />
           </div>
@@ -109,7 +109,7 @@ function PartyCard({
           <label className="label">Phone *</label>
           <div className="grid grid-cols-[72px_1fr] gap-2">
             <span className="input flex items-center justify-center text-gray-500">+{country.phoneCode}</span>
-            <input className={cls("phone")}
+            <input id={`${who}-phone`} name={`${who}_phone`} className={cls("phone")}
               placeholder={country.name === "India" ? "10-digit mobile number" : "10-digit U.S. number"}
               inputMode="tel"
               value={value.phone} onChange={set("phone")} onBlur={blur("phone")} />
@@ -125,7 +125,8 @@ function PartyCard({
           </div>
           <div>
             <label className="label">{country.postalLabel} *</label>
-            <input className={cls("postalCode")} placeholder={country.postalPlaceholder}
+            <input id={`${who}-postalCode`} name={`${who}_postalCode`}
+              className={cls("postalCode")} placeholder={country.postalPlaceholder}
               inputMode={country.name === "India" ? "numeric" : "text"}
               value={value.postalCode} onChange={set("postalCode")} onBlur={blur("postalCode")} />
             <Err show={show("postalCode")} msg={errors.postalCode} />
@@ -134,7 +135,9 @@ function PartyCard({
 
         <div>
           <label className="label">Street address *</label>
-          <input className={cls("street")} placeholder="Building, street, unit"
+          <input id={`${who}-street`} name={`${who}_street`}
+            autoComplete={`section-${who} street-address`}
+            className={cls("street")} placeholder="Building, street, unit"
             value={value.street} onChange={set("street")} onBlur={blur("street")} />
           <Err show={show("street")} msg={errors.street} />
         </div>
@@ -142,13 +145,14 @@ function PartyCard({
         <div className="grid grid-cols-2 gap-2">
           <div>
             <label className="label">City *</label>
-            <input className={cls("city")} placeholder="City"
+            <input id={`${who}-city`} name={`${who}_city`} className={cls("city")} placeholder="City"
               value={value.city} onChange={set("city")} onBlur={blur("city")} />
             <Err show={show("city")} msg={errors.city} />
           </div>
           <div>
             <label className="label">Province / state *</label>
-            <input className={cls("province")} placeholder="Province or state"
+            <input id={`${who}-province`} name={`${who}_province`}
+              className={cls("province")} placeholder="Province or state"
               value={value.province} onChange={set("province")} onBlur={blur("province")} />
             <Err show={show("province")} msg={errors.province} />
           </div>
@@ -541,10 +545,12 @@ export default function BookShipmentPage() {
           </p>
 
         <PartyCard letter="A" title="From" subtitle="Pickup contact and address" who="sender"
-          value={sender} onChange={setSender} errors={senderErrors} showErrors={showErrors} country={route.from}
+          value={sender} onChange={(key, value) => setSender((current) => ({ ...current, [key]: value }))}
+          errors={senderErrors} showErrors={showErrors} country={route.from}
           compact />
         <PartyCard letter="B" title="To" subtitle="Recipient and delivery address" who="receiver"
-          value={receiver} onChange={setReceiver} errors={receiverErrors} showErrors={showErrors} country={route.to}
+          value={receiver} onChange={(key, value) => setReceiver((current) => ({ ...current, [key]: value }))}
+          errors={receiverErrors} showErrors={showErrors} country={route.to}
           compact />
 
         {/* Sticky summary sidebar */}
@@ -676,11 +682,6 @@ export default function BookShipmentPage() {
         )}
       </form>
 
-      <a href={`https://wa.me/${WHATSAPP_NUMBER}`} target="_blank" rel="noreferrer"
-        className="fixed bottom-6 right-6 flex items-center gap-2 bg-green-500 hover:bg-green-600
-                   text-white font-semibold px-4 py-3 rounded-full shadow-lg transition-colors">
-        <FiMessageCircle size={18} /> Chat with us
-      </a>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { BrandingProvider } from "./context/BrandingContext";
+import WhatsAppPlaceholder from "./components/WhatsAppPlaceholder";
 
 // Public pages
 import LandingPage from "./pages/LandingPage";
@@ -74,6 +75,7 @@ export default function App() {
   return (
     <AuthProvider>
       <BrandingProvider>
+      <>
       <Routes>
 
         {/* ── Public (no auth) ───────────────────────── */}
@@ -130,6 +132,8 @@ export default function App() {
         <Route path="*"  element={<Navigate to="/" replace />} />
 
       </Routes>
+      <WhatsAppPlaceholder />
+      </>
       </BrandingProvider>
     </AuthProvider>
   );
