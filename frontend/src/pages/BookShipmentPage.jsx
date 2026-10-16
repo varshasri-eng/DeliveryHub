@@ -543,11 +543,31 @@ export default function BookShipmentPage() {
   }
 
   return (
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10">
+    <div className="min-h-[70vh] bg-gradient-to-b from-[#f4f8f5] via-white to-white px-4 py-8 sm:px-6 sm:py-12">
+      <div className="mx-auto max-w-7xl">
+      <div className="mb-7 flex flex-wrap items-end justify-between gap-4 rounded-[2rem] bg-gray-950 px-6 py-6 text-white shadow-xl shadow-gray-900/10 sm:px-8">
+        <div>
+          <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-emerald-200">
+            Booking · Step 03
+          </p>
+          <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">
+            Tell us where it’s going.
+          </h1>
+          <p className="mt-2 text-sm text-white/65">
+            {service.name} · {route.label}
+            {subservice ? ` · ${subservice.name}` : tier ? ` · ${tier.tier_name}` : ""}
+          </p>
+        </div>
+        <div className="flex items-center gap-2 rounded-full border border-white/10 bg-white/10 px-4 py-2 text-xs font-semibold text-white/80">
+          <span className="h-2 w-2 rounded-full bg-emerald-300" />
+          Your details stay with this booking
+        </div>
+      </div>
       <form onSubmit={submit} noValidate
         className="grid gap-3 items-start lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_290px]">
-          <p className="lg:col-span-3 text-sm font-semibold text-brand-700">
-            {DIRECTIONS[direction].label}
+          <p className="lg:col-span-3 flex items-center gap-2 text-sm font-bold text-brand-800">
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-100 text-xs">01</span>
+            Pickup and delivery contacts · {DIRECTIONS[direction].label}
           </p>
 
         <PartyCard letter="A" title="From" subtitle="Pickup contact and address" who="sender"
@@ -560,7 +580,7 @@ export default function BookShipmentPage() {
           compact />
 
         {/* Sticky summary sidebar */}
-        <div className="card p-3 space-y-2">
+        <div className="card space-y-3 rounded-2xl border-gray-100 p-4 shadow-lg shadow-gray-900/[0.04] lg:sticky lg:top-24">
           {subservices.length > 0 && (
             <div>
               <p className="font-semibold text-gray-900 text-sm mb-2">
@@ -688,6 +708,7 @@ export default function BookShipmentPage() {
         )}
       </form>
 
+      </div>
     </div>
   );
 }

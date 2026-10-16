@@ -85,6 +85,9 @@ export default function Footer() {
             <Link to="/services" className="block text-gray-600 hover:text-brand-600 transition-colors">
               Shipping services
             </Link>
+            <Link to="/track" className="block text-gray-600 hover:text-brand-600 transition-colors">
+              Track shipment
+            </Link>
             <Link to="/#about-us" className="block text-gray-600 hover:text-brand-600 transition-colors">
               About Us
             </Link>
