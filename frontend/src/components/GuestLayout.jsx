@@ -55,6 +55,12 @@ export default function GuestLayout() {
               FAQs
             </Link>
             <Link
+              to="/login"
+              className="rounded-full px-4 py-2 text-sm font-semibold text-gray-600 transition-colors hover:bg-gray-50 hover:text-gray-900"
+            >
+              Sign in
+            </Link>
+            <Link
               to="/services"
               className="ml-2 inline-flex items-center gap-2 rounded-full bg-gray-950 px-5 py-3 text-sm font-semibold text-white shadow-lg shadow-gray-900/10 transition hover:-translate-y-0.5 hover:bg-brand-800"
             >
@@ -78,6 +84,7 @@ export default function GuestLayout() {
                 ["/track", "Track shipment"],
                 ["/#about-us", "About"],
                 ["/#faqs", "FAQs"],
+                ["/login", "Sign in"],
               ].map(([to, label]) => (
                 <Link key={to} to={to} onClick={() => setMenuOpen(false)}
                   className="rounded-xl px-4 py-3 text-sm font-semibold text-gray-700 transition-colors hover:bg-brand-50 hover:text-brand-800">
