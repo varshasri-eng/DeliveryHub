@@ -118,7 +118,7 @@ export default function LandingPage() {
                     className={`group rounded-2xl border p-4 text-left transition-all duration-300 hover:-translate-y-1 hover:shadow-lg ${
                       direction === option.id
                         ? "border-brand-500 bg-white shadow-md shadow-brand-900/10 ring-2 ring-brand-500/10"
-                        : "border-white bg-white/75 hover:border-brand-200"
+                        : "border-white bg-white/75 hover:border-gray-200 hover:bg-gray-100"
                     }`}>
                     <span className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 text-brand-700 transition-colors group-hover:bg-brand-600 group-hover:text-white">
                       <FiArrowRight className={option.id === "IN_TO_US" ? "rotate-180" : ""} size={18} />
@@ -272,7 +272,7 @@ export default function LandingPage() {
               <Reveal as="button" delay={index * 90}
                 key={service.id}
                 onClick={() => navigate(`/services/${service.slug}`)}
-                className="group rounded-3xl border border-gray-100 bg-white p-6 text-left shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:border-brand-200 hover:shadow-xl hover:shadow-brand-900/5"
+                className="group rounded-3xl border border-gray-100 bg-white p-6 text-left shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:border-gray-200 hover:bg-gray-100 hover:shadow-xl hover:shadow-brand-900/5 motion-reduce:transform-none"
               >
                 <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-50 text-3xl transition-transform duration-300 group-hover:scale-110">{service.icon || "📦"}</span>
                 <span className="mt-5 block font-bold text-gray-950">{service.name}</span>
@@ -300,8 +300,8 @@ export default function LandingPage() {
           </div>
           <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             {FEATURES.map((feature, index) => (
-              <Reveal key={feature.title} delay={index * 80} className="group rounded-3xl border border-gray-100 bg-white p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
-                <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-50 text-brand-700 transition-colors group-hover:bg-brand-700 group-hover:text-white">
+              <Reveal key={feature.title} delay={index * 80} className="group rounded-3xl border border-gray-100 bg-white p-6 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:border-gray-200 hover:bg-gray-100 hover:shadow-xl motion-reduce:transform-none">
+                <div className="mb-5 flex h-12 w-12 items-center justify-center rounded-2xl bg-brand-50 text-brand-700 transition-colors group-hover:bg-white">
                   {feature.icon}
                 </div>
                 <h3 className="mb-2 font-bold text-gray-950">{feature.title}</h3>
@@ -320,7 +320,7 @@ export default function LandingPage() {
         <ol className="grid gap-5 md:grid-cols-3">
           {HOW_IT_WORKS.map((step, index) => (
             <li key={step.title}
-              className="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm transition duration-200 ease-out hover:-translate-y-1 hover:shadow-lg motion-reduce:transform-none">
+              className="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm transition duration-300 ease-out hover:-translate-y-1 hover:border-gray-200 hover:bg-gray-100 hover:shadow-lg motion-reduce:transform-none motion-reduce:transition-none">
               <span className="mb-4 flex h-10 w-10 items-center justify-center rounded-full bg-gray-950 text-sm font-bold text-white">{index + 1}</span>
               <h3 className="font-bold text-gray-950">{step.title}</h3>
               <p className="mt-2 text-sm leading-6 text-gray-500">{step.description}</p>
