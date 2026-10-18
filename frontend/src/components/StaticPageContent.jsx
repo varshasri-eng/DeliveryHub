@@ -1,6 +1,9 @@
+import { useId, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { Link } from "react-router-dom";
-import { FiArrowRight, FiBookOpen, FiCheck, FiHelpCircle, FiInfo } from "react-icons/fi";
+import {
+  FiArrowRight, FiBookOpen, FiCheck, FiHelpCircle, FiInfo, FiMinus, FiPlus,
+} from "react-icons/fi";
 
 const PAGE_TYPES = {
   standard: { label: "Information", icon: FiInfo },
@@ -75,6 +78,79 @@ function bandComponents() {
   };
 }
 
+// Admins add a picture with a Markdown image on its own line, e.g.
+//   ![Courier with a parcel](/images/about.jpg)     (file in frontend/public/images)
+//   ![Courier with a parcel](https://example.com/photo.jpg)
+// The first image in a block is lifted out of the text and shown beside it.
+const IMAGE_LINE = /^[ \t]*!\[([^\]]*)\]\(\s*([^)\s]+)(?:\s+"[^"]*")?\s*\)[ \t]*$/m;
+
+export function takeImage(text) {
+  const source = String(text || "");
+  const match = source.match(IMAGE_LINE);
+  if (!match) return { text: source.trim(), image: null };
+  const src = match[2];
+  const safe = /^(https?:\/\/|\/(?!\/))/i.test(src);
+  return {
+    text: source.replace(match[0], "").replace(/\n{3,}/g, "\n\n").trim(),
+    image: safe ? { alt: match[1], src } : null,
+  };
+}
+
+// Built-in illustration, shown whenever a page has no picture (or it fails to load).
+function PageArt() {
+  return (
+    <div className="absolute inset-0 overflow-hidden bg-gradient-to-br from-gray-950 via-brand-800 to-brand-600">
+      <div className="absolute -right-16 -top-16 h-64 w-64 rounded-full border border-white/10" />
+      <div className="absolute -bottom-24 -left-20 h-72 w-72 rounded-full bg-brand-400/20 blur-3xl" />
+      <svg viewBox="0 0 400 320" role="img" aria-label="Illustration of a parcel travelling between the United States and India"
+        className="absolute inset-0 h-full w-full">
+        <path d="M70 215 C130 90 270 70 336 160" fill="none" stroke="#bbf7d0" strokeWidth="3" strokeLinecap="round" strokeDasharray="8 12" />
+        <circle cx="70" cy="215" r="9" fill="#bbf7d0" />
+        <circle cx="336" cy="160" r="9" fill="#fde68a" />
+        <g transform="translate(146 118) scale(0.95)">
+          <path d="M54 4 101 28 54 52 7 28 54 4Z" fill="#f8d98b" />
+          <path d="M7 28v54l47 26V52L7 28Z" fill="#e5a64f" />
+          <path d="M101 28v54L54 108V52l47-24Z" fill="#f2bf69" />
+          <path d="m34 18 47 25M54 52v56" fill="none" stroke="#9a672d" strokeOpacity=".56" strokeWidth="3" />
+        </g>
+        <g fill="white" fontFamily="Inter, sans-serif" fontSize="12" fontWeight="700">
+          <text x="40" y="250">UNITED STATES</text>
+          <text x="300" y="196">INDIA</text>
+        </g>
+      </svg>
+    </div>
+  );
+}
+
+function PageImage({ image, badge, className = "" }) {
+  const [failed, setFailed] = useState(false);
+  return (
+    <div className={`relative ${className}`}>
+      <div className="relative aspect-[5/4] overflow-hidden rounded-3xl bg-gray-100 shadow-xl shadow-gray-900/10">
+        {image && !failed ? (
+          <img
+            src={image.src}
+            alt={image.alt || ""}
+            loading="lazy"
+            onError={() => setFailed(true)}
+            className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 ease-out hover:scale-105 motion-reduce:transform-none"
+          />
+        ) : (
+          <PageArt />
+        )}
+      </div>
+      {badge && (
+        <div className="absolute -bottom-4 left-5 flex items-center gap-2 rounded-xl bg-white px-4 py-3 text-sm font-bold text-gray-900 shadow-lg">
+          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-brand-100 text-brand-700">
+            <FiCheck size={12} />
+          </span>
+          {badge}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function parseFaqSections(content) {
   const parts = String(content || "").split(/^###\s+(.+)$/m);
   const introduction = parts.shift()?.trim() || "";
@@ -96,11 +172,13 @@ function parseFaqSections(content) {
 export function parseAboutContent(content) {
   const text = String(content || "").replace(/\r\n/g, "\n");
   const parts = text.split(/^##\s+(.+)$/m);
-  const intro = parts.shift()?.trim() || "";
+  const introPart = takeImage(parts.shift() || "");
+  const intro = introPart.text;
   const sections = [];
   for (let index = 0; index < parts.length; index += 2) {
     const title = parts[index]?.trim() || "";
-    const body = parts[index + 1] || "";
+    const sectionPart = takeImage(parts[index + 1] || "");
+    const body = sectionPart.text;
     const cardParts = body.split(/^###\s+(.+)$/m);
     const lead = cardParts.shift()?.trim() || "";
     const cards = [];
@@ -110,9 +188,9 @@ export function parseAboutContent(content) {
         body: cardParts[cardIndex + 1]?.trim() || "",
       });
     }
-    sections.push({ title, lead, cards });
+    sections.push({ title, lead, cards, image: sectionPart.image });
   }
-  return { intro, sections };
+  return { intro, introImage: introPart.image, sections };
 }
 
 export default function StaticPageContent({ page, embedded = false }) {
@@ -170,7 +248,9 @@ export default function StaticPageContent({ page, embedded = false }) {
       </header>
 
       {pageType === "faq" ? (
-        <FaqContent content={page.content} components={components} />
+        <div className="mt-8">
+          <FaqContent content={page.content} components={components} />
+        </div>
       ) : useAboutLayout ? (
         <div className="mt-8">
           <AboutContent parsed={aboutLayout} />
@@ -193,17 +273,34 @@ function ProseCard({ content, components, className = "" }) {
 }
 
 function AboutContent({ parsed }) {
-  const { intro, sections } = parsed;
+  const { intro, introImage, sections } = parsed;
   const prose = markdownComponents();
   const introMd = introComponents();
   const card = cardComponents();
   const band = bandComponents();
 
   return (
-    <div className="space-y-12">
+    <div className="space-y-16">
       {intro && (
-        <div className="max-w-3xl">
-          <ReactMarkdown components={introMd}>{intro}</ReactMarkdown>
+        <div className="grid items-center gap-10 lg:grid-cols-[1.1fr_0.9fr]">
+          <div className="max-w-2xl">
+            <ReactMarkdown components={introMd}>{intro}</ReactMarkdown>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <Link
+                to="/services"
+                className="inline-flex items-center gap-2 rounded-full bg-gray-950 px-6 py-3 text-sm font-bold text-white transition hover:-translate-y-0.5 hover:bg-brand-800 motion-reduce:transform-none"
+              >
+                Explore services <FiArrowRight size={16} />
+              </Link>
+              <Link
+                to="/track"
+                className="inline-flex items-center rounded-full border border-gray-200 bg-white px-6 py-3 text-sm font-bold text-gray-800 transition hover:bg-gray-100"
+              >
+                Track a shipment
+              </Link>
+            </div>
+          </div>
+          <PageImage image={introImage} badge="United States ↔ India" />
         </div>
       )}
 
@@ -229,9 +326,9 @@ function AboutContent({ parsed }) {
                 {section.cards.map((item, cardIndex) => (
                   <article
                     key={`${item.title}-${cardIndex}`}
-                    className="group rounded-3xl border border-gray-100 bg-white p-6 shadow-sm transition duration-200 ease-out hover:-translate-y-1 hover:border-brand-200 hover:shadow-lg motion-reduce:transform-none motion-reduce:transition-none"
+                    className="group rounded-3xl border border-gray-100 bg-white p-6 shadow-sm transition duration-300 ease-out hover:-translate-y-1 hover:border-gray-200 hover:bg-gray-100 hover:shadow-lg motion-reduce:transform-none motion-reduce:transition-none"
                   >
-                    <span className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 text-sm font-extrabold text-brand-700 transition-colors group-hover:bg-brand-700 group-hover:text-white">
+                    <span className="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-brand-50 text-sm font-extrabold text-brand-700 transition-colors group-hover:bg-white">
                       {String(cardIndex + 1).padStart(2, "0")}
                     </span>
                     <h4 className="text-lg font-bold text-gray-950">{item.title}</h4>
@@ -252,28 +349,29 @@ function AboutContent({ parsed }) {
               className="relative overflow-hidden rounded-[2rem] bg-gray-950 px-6 py-9 text-white shadow-xl shadow-gray-900/10 sm:px-10 sm:py-12"
             >
               <div aria-hidden="true" className="absolute -right-16 -top-24 h-64 w-64 rounded-full border-[32px] border-white/[0.05]" />
-              <div aria-hidden="true" className="absolute -bottom-24 right-24 h-56 w-56 rounded-full bg-brand-700/30 blur-3xl" />
-              <div className="relative grid gap-8 md:grid-cols-[1.15fr_0.85fr] md:items-center">
+              <div aria-hidden="true" className="absolute -bottom-24 left-1/3 h-56 w-56 rounded-full bg-brand-700/30 blur-3xl" />
+              <div className="relative grid gap-10 md:grid-cols-2 md:items-center">
                 <div>
                   <h3 className="max-w-xl text-2xl font-extrabold tracking-tight sm:text-3xl">
                     {section.title}
                   </h3>
                   <ReactMarkdown components={band}>{section.lead}</ReactMarkdown>
+                  <div className="mt-6 flex flex-wrap gap-3">
+                    <Link
+                      to="/services"
+                      className="inline-flex items-center justify-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-bold text-gray-950 transition hover:-translate-y-0.5 hover:bg-gray-200 motion-reduce:transform-none"
+                    >
+                      Book a shipment <FiArrowRight size={16} />
+                    </Link>
+                    <Link
+                      to="/track"
+                      className="inline-flex items-center justify-center rounded-full border border-white/25 px-6 py-3 text-sm font-bold text-white transition hover:bg-white/10"
+                    >
+                      Track a shipment
+                    </Link>
+                  </div>
                 </div>
-                <div className="flex flex-col gap-3 sm:flex-row md:flex-col md:items-stretch">
-                  <Link
-                    to="/services"
-                    className="inline-flex items-center justify-center gap-2 rounded-full bg-white px-6 py-3 text-sm font-bold text-gray-950 transition hover:-translate-y-0.5 hover:bg-brand-50 motion-reduce:transform-none"
-                  >
-                    Book a shipment <FiArrowRight size={16} />
-                  </Link>
-                  <Link
-                    to="/track"
-                    className="inline-flex items-center justify-center gap-2 rounded-full border border-white/25 px-6 py-3 text-sm font-bold text-white transition hover:bg-white/10"
-                  >
-                    Track a shipment
-                  </Link>
-                </div>
+                <PageImage image={section.image} badge="Reference number on every booking" className="mb-4 md:mb-0" />
               </div>
             </div>
           );
@@ -292,43 +390,85 @@ function AboutContent({ parsed }) {
   );
 }
 
-function FaqContent({ content, components }) {
-  const { introduction, questions } = parseFaqSections(content);
+function FaqItem({ question, answer, open, onToggle, components }) {
+  const id = useId();
+  const buttonId = `${id}-button`;
+  const panelId = `${id}-panel`;
   return (
-    <div className="mt-8 grid gap-6 lg:grid-cols-[minmax(0,0.7fr)_minmax(0,1.3fr)]">
-      {introduction && (
-        <div className="h-fit rounded-2xl border border-brand-100 bg-brand-50/70 p-6">
-          <p className="text-xs font-bold uppercase tracking-wide text-brand-700">Before you book</p>
-          <div className="mt-3">
-            <ReactMarkdown components={components}>{introduction}</ReactMarkdown>
+    <div
+      className={`rounded-2xl border transition-colors duration-200 ${
+        open ? "border-gray-200 bg-gray-100" : "border-gray-100 bg-white hover:bg-gray-100"
+      }`}
+    >
+      <h3>
+        <button
+          type="button"
+          id={buttonId}
+          aria-expanded={open}
+          aria-controls={panelId}
+          onClick={onToggle}
+          className="flex w-full items-start justify-between gap-4 rounded-2xl px-5 py-4 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-brand-500"
+        >
+          <span className={`font-bold leading-6 transition-colors ${open ? "text-brand-700" : "text-gray-900"}`}>
+            {question}
+          </span>
+          <span aria-hidden="true" className="mt-0.5 flex-shrink-0 text-brand-700">
+            {open ? <FiMinus size={20} /> : <FiPlus size={20} />}
+          </span>
+        </button>
+      </h3>
+      <div
+        id={panelId}
+        role="region"
+        aria-labelledby={buttonId}
+        className={`grid transition-[grid-template-rows,visibility] duration-300 ease-out motion-reduce:transition-none ${
+          open ? "visible grid-rows-[1fr]" : "invisible grid-rows-[0fr]"
+        }`}
+      >
+        <div className="overflow-hidden">
+          <div className="px-5 pb-5">
+            {answer ? (
+              <ReactMarkdown components={components}>{answer}</ReactMarkdown>
+            ) : null}
           </div>
         </div>
-      )}
-      <div className="space-y-3">
-        {questions.length ? questions.map(({ question, answer }, index) => (
-          <details key={`${question}-${index}`}
-            className="group rounded-2xl border border-gray-100 bg-white p-5 shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-brand-200 hover:shadow-lg open:border-brand-200 open:shadow-md">
-            <summary className="cursor-pointer list-none pr-8 font-bold text-gray-900 marker:hidden [&::-webkit-details-marker]:hidden">
-              <span className="relative block">
-                {question}
-                <span aria-hidden="true"
-                  className="absolute right-0 top-0 text-xl leading-none text-brand-600 transition-transform group-open:rotate-45">
-                  +
-                </span>
-              </span>
-            </summary>
-            {answer && (
-              <div className="faq-answer-enter mt-3 border-t border-gray-100 pt-1">
-                <ReactMarkdown components={components}>{answer}</ReactMarkdown>
-              </div>
-            )}
-          </details>
-        )) : (
-          <div className="rounded-2xl border border-dashed border-gray-200 bg-white p-6 text-sm text-gray-500">
-            Add each question as a level-three heading using <code>### Question</code> in the page editor.
+      </div>
+    </div>
+  );
+}
+
+function FaqContent({ content, components }) {
+  const parsed = parseFaqSections(content);
+  const { text: introduction, image } = takeImage(parsed.introduction);
+  const { questions } = parsed;
+  const [openIndex, setOpenIndex] = useState(0);
+
+  return (
+    <div className="grid items-start gap-10 lg:grid-cols-[1.1fr_0.9fr]">
+      <div>
+        {introduction && (
+          <div className="mb-5 max-w-2xl">
+            <ReactMarkdown components={components}>{introduction}</ReactMarkdown>
           </div>
         )}
+        <div className="space-y-3">
+          {questions.length ? questions.map(({ question, answer }, index) => (
+            <FaqItem
+              key={`${question}-${index}`}
+              question={question}
+              answer={answer}
+              components={components}
+              open={openIndex === index}
+              onToggle={() => setOpenIndex(openIndex === index ? -1 : index)}
+            />
+          )) : (
+            <div className="rounded-2xl border border-dashed border-gray-200 bg-white p-6 text-sm text-gray-500">
+              Add each question as a level-three heading using <code>### Question</code> in the page editor.
+            </div>
+          )}
+        </div>
       </div>
+      <PageImage image={image} className="lg:sticky lg:top-28" />
     </div>
   );
 }
