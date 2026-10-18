@@ -396,8 +396,8 @@ function FaqItem({ question, answer, open, onToggle, components }) {
   const panelId = `${id}-panel`;
   return (
     <div
-      className={`rounded-2xl border transition-colors duration-200 ${
-        open ? "border-gray-200 bg-gray-100" : "border-gray-100 bg-white hover:bg-gray-100"
+      className={`rounded-2xl border transition duration-300 ease-out hover:-translate-y-1 hover:border-gray-200 hover:bg-gray-100 hover:shadow-lg motion-reduce:transform-none motion-reduce:transition-none ${
+        open ? "border-gray-200 bg-gray-100 shadow-sm" : "border-gray-100 bg-white shadow-sm"
       }`}
     >
       <h3>
