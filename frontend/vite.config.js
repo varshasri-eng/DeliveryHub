@@ -9,6 +9,9 @@ export default defineConfig({
   server: {
     host: "0.0.0.0",
     port: 3000,
+    // Allow requests that arrive under the public domain (nginx forwards the
+    // original Host header). Without this Vite rejects them as "host not allowed".
+    allowedHosts: ["deliveryhubca.com", "www.deliveryhubca.com"],
     proxy: {
       "/api": {
         target: backendTarget,
