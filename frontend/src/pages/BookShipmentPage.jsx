@@ -99,7 +99,7 @@ function PartyCard({
   letter, title, subtitle, who, value, onChange, errors, showErrors, country, compact = false,
 }) {
   const [touched, setTouched] = useState({});
-  const [lookup, setLookup] = useState({ status: "idle", cities: [] });
+  const [lookup, setLookup] = useState({ status: "idle", cities: [], state: "", stateAbbr: "" });
   const valueRef = useRef(value);
   valueRef.current = value;
   const onChangeRef = useRef(onChange);
@@ -110,7 +110,7 @@ function PartyCard({
   useEffect(() => {
     const code = (value.postalCode || "").trim();
     if (!country.postalPattern.test(code)) {
-      setLookup({ status: "idle", cities: [] });
+      setLookup({ status: "idle", cities: [], state: "", stateAbbr: "" });
       return undefined;
     }
     let cancelled = false;
@@ -119,23 +119,23 @@ function PartyCard({
       getPostalLookup(country.name, code)
         .then((response) => {
           if (cancelled) return;
-          const { found, cities = [], state = "" } = response.data || {};
+          const { found, cities = [], state = "", state_abbr: stateAbbr = "" } = response.data || {};
           if (!found) {
-            setLookup({ status: "notfound", cities: [] });
+            setLookup({ status: "notfound", cities: [], state: "", stateAbbr: "" });
             return;
           }
           const current = valueRef.current;
           if (cities.length && !cities.some((city) => sameLocation(city, current.city))) {
             onChangeRef.current("city", cities[0]);
           }
-          if (state && !sameLocation(state, current.province)) {
+          if (state && !sameLocation(state, current.province) && !sameLocation(stateAbbr, current.province)) {
             onChangeRef.current("province", state);
           }
-          setLookup({ status: "found", cities });
+          setLookup({ status: "found", cities, state, stateAbbr });
         })
         .catch(() => {
           // Lookup service unavailable: leave the fields for manual entry.
-          if (!cancelled) setLookup({ status: "error", cities: [] });
+          if (!cancelled) setLookup({ status: "error", cities: [], state: "", stateAbbr: "" });
         });
     }, 400);
     return () => {
@@ -153,6 +153,11 @@ function PartyCard({
     onChange(key, next);
   };
   const blur = (k) => () => setTouched((t) => ({ ...t, [k]: true }));
+  // Warn (before submitting) when the typed city or state does not belong to the code.
+  const stateWarning = lookup.status === "found" && lookup.state && value.province.trim() &&
+    !sameLocation(lookup.state, value.province) && !sameLocation(lookup.stateAbbr, value.province);
+  const cityWarning = lookup.status === "found" && lookup.cities.length > 0 && value.city.trim() &&
+    !lookup.cities.some((city) => sameLocation(city, value.city));
   const show = (k) => (showErrors || touched[k]) && errors[k];
   const cls = (k) => `input ${show(k) ? "border-red-400" : ""}`;
 
@@ -238,6 +243,11 @@ function PartyCard({
               className={cls("city")} placeholder="City"
               value={value.city} onChange={set("city")} onBlur={blur("city")} />
             <Err show={show("city")} msg={errors.city} />
+            {cityWarning && (
+              <p role="alert" className="mt-1 text-xs font-medium text-amber-700">
+                This city does not match {value.postalCode}. Suggested: {lookup.cities.slice(0, 3).join(", ")}.
+              </p>
+            )}
             {lookup.cities.length > 1 && (
               <div className="mt-1 flex flex-wrap gap-1" aria-label="Suggested cities">
                 {lookup.cities.slice(0, 6).map((city) => (
@@ -260,6 +270,15 @@ function PartyCard({
               className={cls("province")} placeholder="Province or state"
               value={value.province} onChange={set("province")} onBlur={blur("province")} />
             <Err show={show("province")} msg={errors.province} />
+            {stateWarning && (
+              <p role="alert" className="mt-1 text-xs font-medium text-amber-700">
+                {value.postalCode} is in {lookup.state}.{" "}
+                <button type="button" onClick={() => onChange("province", lookup.state)}
+                  className="font-bold underline underline-offset-2">
+                  Use {lookup.state}
+                </button>
+              </p>
+            )}
           </div>
         </div>
       </div>

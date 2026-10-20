@@ -508,17 +508,19 @@ def postal_lookup():
     except RuntimeError as error:
         return jsonify({"error": str(error)}), 503
 
-    names, districts, states = [], [], []
+    names, districts, states, abbreviations = [], [], [], []
     for location in locations:
         cities = location["cities"]
         if cities:
             names.append(_OFFICE_SUFFIX.sub("", (cities[0] or "").strip()))
         districts.extend((c or "").strip() for c in cities[1:])
         states.extend(s for s in location["states"] if s and len(s) > 2)
+        abbreviations.extend(s for s in location["states"] if s and len(s) == 2)
     result = {
         "found": bool(locations),
         "cities": _unique(names + districts),
         "state": states[0] if states else "",
+        "state_abbr": abbreviations[0] if abbreviations else "",
     }
     if len(_POSTAL_CACHE) >= _POSTAL_CACHE_MAX:
         _POSTAL_CACHE.clear()
