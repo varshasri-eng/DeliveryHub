@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
 import toast from "react-hot-toast";
 import { FiCheckCircle, FiDownload } from "react-icons/fi";
 import { getService } from "../api/services";
-import { createShipment, createGuestShipment, validateOfferCode } from "../api/shipments";
+import { createShipment, createGuestShipment, validateOfferCode, getPostalLookup } from "../api/shipments";
 import { useAuth } from "../context/AuthContext";
 import { formatMoney } from "../utils/money";
 import { downloadShipmentSummary } from "../utils/shipmentSummary";
@@ -82,6 +82,14 @@ function stripCountryCode(raw, code) {
   return raw;
 }
 
+// Compare place names loosely: ignore case, punctuation and India Post office
+// codes such as "H.O" / "S.O" ("Secunderabad H.O" is the same place as "Secunderabad").
+const normLocation = (value) =>
+  String(value || "").toLowerCase()
+    .replace(/\s+(?:h\s*\.?\s*o|s\s*\.?\s*o|b\s*\.?\s*o|g\s*\.?\s*p\s*\.?\s*o)\s*\.?$/, "")
+    .replace(/[^a-z0-9]/g, "");
+const sameLocation = (a, b) => normLocation(a) !== "" && normLocation(a) === normLocation(b);
+
 function Err({ show, msg }) {
   if (!show || !msg) return null;
   return <p className="text-xs font-medium text-red-600 mt-1">{msg}</p>;
@@ -91,6 +99,51 @@ function PartyCard({
   letter, title, subtitle, who, value, onChange, errors, showErrors, country, compact = false,
 }) {
   const [touched, setTouched] = useState({});
+  const [lookup, setLookup] = useState({ status: "idle", cities: [] });
+  const valueRef = useRef(value);
+  valueRef.current = value;
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+
+  // Once a complete ZIP / postal code is entered, look up its city and state and
+  // fill them in. People can still edit the fields, or pick another suggestion.
+  useEffect(() => {
+    const code = (value.postalCode || "").trim();
+    if (!country.postalPattern.test(code)) {
+      setLookup({ status: "idle", cities: [] });
+      return undefined;
+    }
+    let cancelled = false;
+    setLookup((current) => ({ ...current, status: "loading" }));
+    const timer = setTimeout(() => {
+      getPostalLookup(country.name, code)
+        .then((response) => {
+          if (cancelled) return;
+          const { found, cities = [], state = "" } = response.data || {};
+          if (!found) {
+            setLookup({ status: "notfound", cities: [] });
+            return;
+          }
+          const current = valueRef.current;
+          if (cities.length && !cities.some((city) => sameLocation(city, current.city))) {
+            onChangeRef.current("city", cities[0]);
+          }
+          if (state && !sameLocation(state, current.province)) {
+            onChangeRef.current("province", state);
+          }
+          setLookup({ status: "found", cities });
+        })
+        .catch(() => {
+          // Lookup service unavailable: leave the fields for manual entry.
+          if (!cancelled) setLookup({ status: "error", cities: [] });
+        });
+    }, 400);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [value.postalCode, country.name]);
+
   const set = (key) => (event) => {
     let next = event.target.value;
     if (key === "phone") next = stripCountryCode(next, country.phoneCode);
@@ -157,6 +210,14 @@ function PartyCard({
               inputMode={country.name === "India" ? "numeric" : "text"}
               value={value.postalCode} onChange={set("postalCode")} onBlur={blur("postalCode")} />
             <Err show={show("postalCode")} msg={errors.postalCode} />
+            {lookup.status === "loading" && (
+              <p className="mt-1 text-xs text-gray-400">Looking up city and state…</p>
+            )}
+            {lookup.status === "notfound" && (
+              <p className="mt-1 text-xs font-medium text-amber-700">
+                We could not find this {country.postalLabel}. Please check it.
+              </p>
+            )}
           </div>
         </div>
 
@@ -177,6 +238,20 @@ function PartyCard({
               className={cls("city")} placeholder="City"
               value={value.city} onChange={set("city")} onBlur={blur("city")} />
             <Err show={show("city")} msg={errors.city} />
+            {lookup.cities.length > 1 && (
+              <div className="mt-1 flex flex-wrap gap-1" aria-label="Suggested cities">
+                {lookup.cities.slice(0, 6).map((city) => (
+                  <button key={city} type="button" onClick={() => onChange("city", city)}
+                    className={`rounded-full border px-2 py-0.5 text-[11px] font-semibold transition-colors ${
+                      sameLocation(city, value.city)
+                        ? "border-brand-500 bg-brand-50 text-brand-800"
+                        : "border-gray-200 text-gray-600 hover:bg-gray-100"
+                    }`}>
+                    {city}
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
           <div>
             <label className="label">Province / state *</label>

@@ -16,6 +16,9 @@ export const createGuestShipment = (data) =>
 export const validateOfferCode = (data) =>
   api.post("/shipments/offer-codes/validate", data);
 
+export const getPostalLookup = (country, postalCode) =>
+  api.get("/shipments/postal-lookup", { params: { country, postal_code: postalCode } });
+
 export const trackShipment = (shipmentNumber) =>
   api.get(`/shipments/track/${encodeURIComponent(shipmentNumber)}`);
 

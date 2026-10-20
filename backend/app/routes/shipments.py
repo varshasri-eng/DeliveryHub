@@ -21,6 +21,7 @@ import json
 import os
 import re
 import secrets
+import time
 from datetime import datetime, timezone
 from decimal import Decimal, ROUND_HALF_UP
 from urllib.error import HTTPError, URLError
@@ -65,7 +66,10 @@ US_STATE_ABBREVIATIONS = {
 # India Post office names end with an office-type code, e.g. "Secunderabad H.O",
 # "Banjara Hills S.O" or "Hyderabad G.P.O". People copy those names from search
 # results, so the code is ignored when comparing a typed city with the postal data.
-_OFFICE_SUFFIX = re.compile(r"\s+(?:h\s*\.?\s*o|s\s*\.?\s*o|b\s*\.?\s*o|g\s*\.?\s*p\s*\.?\s*o)\s*\.?$")
+_OFFICE_SUFFIX = re.compile(
+    r"\s+(?:h\s*\.?\s*o|s\s*\.?\s*o|b\s*\.?\s*o|g\s*\.?\s*p\s*\.?\s*o)\s*\.?$",
+    re.IGNORECASE,
+)
 
 
 def _normalize_location(value):
@@ -458,6 +462,68 @@ def _get_offer_discount(code, subtotal, reserve=False):
     if reserve:
         offer.times_used += 1
     return offer, percent, discount, None
+
+
+_POSTAL_CACHE = {}
+_POSTAL_CACHE_TTL = 6 * 60 * 60   # seconds
+_POSTAL_CACHE_MAX = 1000
+
+
+def _unique(values):
+    seen, result = set(), []
+    for value in values:
+        key = value.casefold()
+        if value and key not in seen:
+            seen.add(key)
+            result.append(value)
+    return result
+
+
+@shipments_bp.route("/postal-lookup", methods=["GET"])
+def postal_lookup():
+    """
+    Public helper for the booking form: given a ZIP / postal code, return the
+    city names and state it belongs to so the form can fill them in.
+    GET /api/shipments/postal-lookup?country=India&postal_code=500003
+    """
+    country = (request.args.get("country") or "").strip()
+    postal_code = (request.args.get("postal_code") or "").strip()
+    if country == "India":
+        valid = re.fullmatch(r"\d{6}", postal_code)
+    elif country == "United States":
+        valid = re.fullmatch(r"\d{5}(?:-\d{4})?", postal_code)
+    else:
+        valid = None
+    if not valid:
+        return jsonify({"error": "Enter a valid country and postal code."}), 400
+
+    key = (country, postal_code[:5] if country == "United States" else postal_code)
+    now = time.time()
+    cached = _POSTAL_CACHE.get(key)
+    if cached and now - cached[0] < _POSTAL_CACHE_TTL:
+        return jsonify(cached[1])
+
+    try:
+        locations = _lookup_postal_locations(country, postal_code)
+    except RuntimeError as error:
+        return jsonify({"error": str(error)}), 503
+
+    names, districts, states = [], [], []
+    for location in locations:
+        cities = location["cities"]
+        if cities:
+            names.append(_OFFICE_SUFFIX.sub("", (cities[0] or "").strip()))
+        districts.extend((c or "").strip() for c in cities[1:])
+        states.extend(s for s in location["states"] if s and len(s) > 2)
+    result = {
+        "found": bool(locations),
+        "cities": _unique(names + districts),
+        "state": states[0] if states else "",
+    }
+    if len(_POSTAL_CACHE) >= _POSTAL_CACHE_MAX:
+        _POSTAL_CACHE.clear()
+    _POSTAL_CACHE[key] = (now, result)
+    return jsonify(result)
 
 
 @shipments_bp.route("/offer-codes/validate", methods=["POST"])
