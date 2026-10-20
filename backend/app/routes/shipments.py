@@ -62,8 +62,15 @@ US_STATE_ABBREVIATIONS = {
 }
 
 
+# India Post office names end with an office-type code, e.g. "Secunderabad H.O",
+# "Banjara Hills S.O" or "Hyderabad G.P.O". People copy those names from search
+# results, so the code is ignored when comparing a typed city with the postal data.
+_OFFICE_SUFFIX = re.compile(r"\s+(?:h\s*\.?\s*o|s\s*\.?\s*o|b\s*\.?\s*o|g\s*\.?\s*p\s*\.?\s*o)\s*\.?$")
+
+
 def _normalize_location(value):
-    return re.sub(r"[^a-z0-9]", "", (value or "").casefold())
+    text = _OFFICE_SUFFIX.sub("", (value or "").casefold().strip())
+    return re.sub(r"[^a-z0-9]", "", text)
 
 
 def _lookup_postal_locations(country, postal_code):
@@ -184,10 +191,20 @@ def _validate_route_details(data, direction):
                 state_values.add(_normalize_location(matched_state_abbr))
         state_matches = _normalize_location(province) in state_values
         if not city_matches or not state_matches:
+            wrong = [
+                label for label, ok in (("city", city_matches), ("state/province", state_matches))
+                if not ok
+            ]
+            known_cities = sorted({c for loc in locations for c in loc["cities"] if c})[:5]
+            known_states = sorted({s for loc in locations for s in loc["states"] if s and len(s) > 2})
+            belongs_to = ", ".join(known_cities)
+            if known_states:
+                belongs_to += f" ({', '.join(known_states)})"
             return jsonify({
                 "error": (
-                    f"The {role} city and state/province do not match "
-                    f"postal code {postal_code}."
+                    f"The {role} {' and '.join(wrong)} "
+                    f"{'does' if len(wrong) == 1 else 'do'} not match postal code {postal_code}. "
+                    f"This code belongs to: {belongs_to}."
                 )
             }), 400
     return None
