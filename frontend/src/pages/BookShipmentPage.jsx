@@ -45,7 +45,14 @@ function validateParty(p, who, country) {
   const e = {};
   if (!p.name.trim()) e.name = `Enter the ${who}'s name.`;
   const phoneDigits = p.phone.replace(/\D/g, "");
-  if (/[^\d\s()+.-]/.test(p.phone) || !country.phonePattern.test(phoneDigits)) {
+  if (/[^\d\s()+.-]/.test(p.phone)) {
+    e.phone = "Use digits only - no letters or symbols.";
+  } else if (
+    p.phone.trim().startsWith("+") ||
+    (phoneDigits.length > 10 && phoneDigits.startsWith(country.phoneCode))
+  ) {
+    e.phone = `Remove the +${country.phoneCode} country code - it is already added. Enter only the 10-digit number.`;
+  } else if (!country.phonePattern.test(phoneDigits)) {
     e.phone = country.name === "India"
       ? "Enter a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9."
       : "Enter a valid 10-digit U.S. phone number.";
@@ -65,6 +72,16 @@ function validateParty(p, who, country) {
   return e;
 }
 
+// If someone types the country code into the phone box (the +1 / +91 prefix is
+// already shown beside it), drop it so "+91 99597 85999" becomes "9959785999".
+function stripCountryCode(raw, code) {
+  const digits = raw.replace(/\D/g, "");
+  if (digits.length === 10 + code.length && digits.startsWith(code)) {
+    return digits.slice(code.length);
+  }
+  return raw;
+}
+
 function Err({ show, msg }) {
   if (!show || !msg) return null;
   return <p className="text-xs font-medium text-red-600 mt-1">{msg}</p>;
@@ -74,7 +91,14 @@ function PartyCard({
   letter, title, subtitle, who, value, onChange, errors, showErrors, country, compact = false,
 }) {
   const [touched, setTouched] = useState({});
-  const set = (key) => (event) => onChange(key, event.target.value);
+  const set = (key) => (event) => {
+    let next = event.target.value;
+    if (key === "phone") next = stripCountryCode(next, country.phoneCode);
+    // Pasted postal codes often carry stray symbols or spaces (for example a
+    // bullet copied from a search result), so keep only digits and hyphens.
+    if (key === "postalCode") next = next.replace(/[^\d-]/g, "");
+    onChange(key, next);
+  };
   const blur = (k) => () => setTouched((t) => ({ ...t, [k]: true }));
   const show = (k) => (showErrors || touched[k]) && errors[k];
   const cls = (k) => `input ${show(k) ? "border-red-400" : ""}`;
@@ -436,7 +460,23 @@ export default function BookShipmentPage() {
     e.preventDefault();
     if (hasErrors) {
       setShowErrors(true);
-      toast.error("Please fix the highlighted fields.");
+      // Tell the person exactly what is wrong, and jump to that field.
+      const firstSender = Object.entries(senderErrors)[0];
+      const firstReceiver = Object.entries(receiverErrors)[0];
+      const firstParty = firstSender
+        ? ["sender", ...firstSender]
+        : firstReceiver ? ["receiver", ...firstReceiver] : null;
+      if (firstParty) {
+        const [who, key, message] = firstParty;
+        toast.error(`${who === "sender" ? "From" : "To"}: ${message}`);
+        document.getElementById(`${who}-${key}`)?.focus();
+      } else if (Object.keys(fieldErrors).length) {
+        toast.error(Object.values(fieldErrors)[0]);
+      } else if (!tier || (subservices.length > 0 && !subservice) || selectedPrice == null) {
+        toast.error("Please choose a service option with a price before continuing.");
+      } else {
+        toast.error("Please fix the highlighted fields.");
+      }
       return;
     }
     setSubmitting(true);
@@ -686,7 +726,7 @@ export default function BookShipmentPage() {
               </span>
             </div>
           </div>
-          <button type="submit" disabled={submitting || Boolean(hasErrors)} className="btn-primary w-full">
+          <button type="submit" disabled={submitting} className="btn-primary w-full">
             {submitting ? "Submitting…" : "Review shipment"}
           </button>
           <p className="text-xs text-gray-400 text-center">No payment at this step</p>
