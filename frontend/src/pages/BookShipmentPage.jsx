@@ -36,12 +36,13 @@ const emptyParty = () => ({
 function getCarrierNames(service) {
   const tiers = (service?.pricing_tiers || []).filter((t) => (t.sub_services || []).length > 0);
   if (tiers.length < 2) return [];
-  const names = tiers[0].sub_services.map((item) => item.name);
-  const key = [...names].sort().join("|");
-  const same = tiers.every(
-    (t) => t.sub_services.map((item) => item.name).sort().join("|") === key
-  );
-  return same ? names : [];
+  const names = [];
+  tiers.forEach((t) => t.sub_services.forEach((item) => {
+    if (!names.includes(item.name)) names.push(item.name);
+  }));
+  // Treat as "weight x carrier" only when every option is one of a few carriers (not a per-option list)
+  return names.length <= 6 && tiers.every((t) => t.sub_services.length <= names.length) &&
+    tiers.some((t) => t.sub_services.length === names.length) ? names : [];
 }
 
 // "21-44 kg (per kg)" -> "21-44 kg"
@@ -522,7 +523,9 @@ export default function BookShipmentPage() {
   const carriers = getCarrierNames(service);
   const carrierLayout = carriers.length > 0;
   const weightTiers = carrierLayout
-    ? tiers.filter((t) => (t.sub_services || []).length > 0)
+    ? tiers.filter((t) => (t.sub_services || []).some(
+        (x) => !selectedCarrier || x.name === selectedCarrier
+      ))
     : tiers;
   const limitedQty = tier?.max_quantity != null;
   const usesQuantity = limitedQty || Boolean(service.enable_quantity);
@@ -766,7 +769,7 @@ export default function BookShipmentPage() {
         </div>
       </div>
       <form onSubmit={submit} noValidate
-        className="grid gap-6 items-start lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
+        className="grid gap-4 items-start lg:grid-cols-[minmax(0,300px)_minmax(0,1fr)_290px]">
         {/* Left: service information (moved here from the old option page) */}
         <aside className="relative overflow-hidden rounded-[2rem] bg-gray-950 px-6 py-8 text-white shadow-xl shadow-gray-900/10 lg:sticky lg:top-24">
           <div className="absolute -bottom-20 -right-5 h-48 w-48 rounded-full bg-brand-700/25 blur-3xl" />
@@ -822,7 +825,14 @@ export default function BookShipmentPage() {
                   <div>
                     <label htmlFor="carrier-select" className="mb-1 block text-xs font-semibold text-gray-600">Carrier</label>
                     <select id="carrier-select" value={selectedCarrier}
-                      onChange={(e) => setSelectedCarrier(e.target.value)}
+                      onChange={(e) => {
+                        const name = e.target.value;
+                        setSelectedCarrier(name);
+                        const current = tiers.find((t) => t.id === selectedTierId);
+                        if (name && current && !(current.sub_services || []).some((x) => x.name === name)) {
+                          setSelectedTierId(null);
+                        }
+                      }}
                       className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm">
                       <option value="">Select a carrier</option>
                       {carriers.map((name) => <option key={name} value={name}>{name}</option>)}
@@ -917,6 +927,9 @@ export default function BookShipmentPage() {
                 </span>
               </div>
             )}
+            {carrierLayout && (!selectedCarrier || !tier) && (
+              <p className="mt-3 text-xs text-gray-500">Choose a carrier and a weight to see the price.</p>
+            )}
             {showErrors && optionError && !quantityError && !(carrierLayout && !selectedCarrier) && tier && (
               <p className="mt-2 text-xs text-red-600">{optionError}</p>
             )}
@@ -926,7 +939,7 @@ export default function BookShipmentPage() {
             <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-100 text-xs">02</span>
             Pickup and delivery contacts
           </p>
-          <div className="grid gap-3 xl:grid-cols-2">
+          <div className="grid gap-3 2xl:grid-cols-2">
             <PartyCard letter="A" title="From" subtitle="Pickup contact and address" who="sender"
               value={sender} onChange={(key, value) => setSender((current) => ({ ...current, [key]: value }))}
               errors={senderErrors} showErrors={showErrors} country={route.from} compact />
@@ -949,8 +962,10 @@ export default function BookShipmentPage() {
             </div>
           </div>
         )}
+        </div>
+
         {/* Summary */}
-        <div className="card space-y-3 rounded-2xl border-gray-100 p-4 shadow-lg shadow-gray-900/[0.04]">
+        <div className="card space-y-3 rounded-2xl border-gray-100 p-4 shadow-lg shadow-gray-900/[0.04] lg:sticky lg:top-24">
           <p className="font-bold text-gray-900 text-sm">Your route</p>
           <div className="space-y-3 text-sm">
             <div className="flex items-start gap-3">
@@ -981,9 +996,17 @@ export default function BookShipmentPage() {
                 <span className="text-gray-900 font-semibold">{selectedOpt ? splitOption(selectedOpt).title : "—"}</span>
               </div>
             )}
+            {carrierLayout && tier && (
+              <div className="flex justify-between gap-3">
+                <span className="text-gray-400">Weight</span>
+                <span className="text-gray-900 font-semibold text-right">
+                  {weightLabel(tier.tier_name)}{limitedQty && effectiveQty ? ` · ${effectiveQty} kg` : ""}
+                </span>
+              </div>
+            )}
             {subservice && (
               <div className="flex justify-between gap-3">
-                <span className="text-gray-400">Delivery sub-service</span>
+                <span className="text-gray-400">{carrierLayout ? "Carrier" : "Delivery sub-service"}</span>
                 <span className="text-gray-900 font-semibold text-right">{subservice.name}</span>
               </div>
             )}
@@ -1028,7 +1051,9 @@ export default function BookShipmentPage() {
             <div className="flex justify-between">
               <span className="text-gray-400">Total</span>
               <span className="text-gray-900 font-extrabold">
-                {selectedPrice == null ? `${currencyCode} price not set` : money(discountedTotal, currencyCode)}
+                {selectedPrice == null
+                  ? (carrierLayout && (!selectedCarrier || !tier) ? "Choose carrier & weight" : `${currencyCode} price not set`)
+                  : money(discountedTotal, currencyCode)}
               </span>
             </div>
           </div>
@@ -1038,7 +1063,6 @@ export default function BookShipmentPage() {
           <p className="text-xs text-gray-400 text-center">No payment at this step</p>
         </div>
 
-        </div>
       </form>
 
       </div>
