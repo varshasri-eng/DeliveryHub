@@ -97,6 +97,8 @@ class ServicePricingTier(db.Model):
     price_inr = db.Column(db.Numeric(10, 2))
     icon = db.Column(db.String(20))
     display_order = db.Column(db.Integer, default=0)
+    min_quantity = db.Column(db.Integer)
+    max_quantity = db.Column(db.Integer)
 
     sub_services = db.relationship("ServiceSubservice", backref="pricing_tier",
                                   order_by="ServiceSubservice.display_order",
@@ -112,6 +114,8 @@ class ServicePricingTier(db.Model):
             "price_inr": float(self.price_inr) if self.price_inr is not None else None,
             "icon": self.icon,
             "display_order": self.display_order,
+            "min_quantity": self.min_quantity,
+            "max_quantity": self.max_quantity,
             "sub_services": [sub_service.to_dict() for sub_service in self.sub_services],
         }
 

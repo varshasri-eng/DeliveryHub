@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
 import toast from "react-hot-toast";
-import { FiCheckCircle, FiDownload } from "react-icons/fi";
+import { FiArrowLeft, FiCheckCircle, FiDownload, FiGlobe, FiMinus, FiPlus } from "react-icons/fi";
 import { getService } from "../api/services";
 import { createShipment, createGuestShipment, validateOfferCode, getPostalLookup } from "../api/shipments";
 import { useAuth } from "../context/AuthContext";
@@ -29,6 +29,23 @@ const US_TOLL_FREE_CODES = new Set(["800", "833", "844", "855", "866", "877", "8
 const emptyParty = () => ({
   name: "", phone: "", postalCode: "", street: "", city: "", province: "",
 });
+
+// Some services are priced as "weight x carrier": every weight option carries the same
+// carriers (FedEx / DHL / UPS) as its sub-services. Returns those carrier names, or []
+// when the service is not laid out that way.
+function getCarrierNames(service) {
+  const tiers = (service?.pricing_tiers || []).filter((t) => (t.sub_services || []).length > 0);
+  if (tiers.length < 2) return [];
+  const names = tiers[0].sub_services.map((item) => item.name);
+  const key = [...names].sort().join("|");
+  const same = tiers.every(
+    (t) => t.sub_services.map((item) => item.name).sort().join("|") === key
+  );
+  return same ? names : [];
+}
+
+// "21-44 kg (per kg)" -> "21-44 kg"
+const weightLabel = (tierName) => String(tierName || "").replace(/\s*\(per kg\)\s*$/i, "");
 
 function formatAddress(p, country) {
   return [p.street, p.city, [p.province, p.postalCode].filter(Boolean).join(" "), country.name]
@@ -379,7 +396,8 @@ export default function BookShipmentPage() {
   const requestedTierId = Number(searchParams.get("tier"));
   const [selectedTierId, setSelectedTierId] = useState(null);
   const [selectedSubserviceId, setSelectedSubserviceId] = useState(null);
-  const quantity = Math.max(1, parseInt(searchParams.get("qty"), 10) || 1);
+  const [selectedCarrier, setSelectedCarrier] = useState("");
+  const [quantity, setQuantity] = useState(Math.max(1, parseInt(searchParams.get("qty"), 10) || 1));
   const direction = service?.route_direction || "US_TO_IN";
   const route = DIRECTIONS[direction];
 
@@ -392,12 +410,14 @@ export default function BookShipmentPage() {
         const svc = res.data.service;
         setService(svc);
         const tiers = svc.pricing_tiers || [];
+        const carrierLayout = getCarrierNames(svc).length > 0;
+        setSelectedCarrier("");
         setSelectedTierId((current) => (
           tiers.some((t) => t.id === current)
             ? current
             : tiers.some((t) => t.id === requestedTierId)
               ? requestedTierId
-              : tiers[0]?.id ?? null
+              : carrierLayout ? null : tiers[0]?.id ?? null
         ));
         const initial = {};
         (svc.fields || []).forEach((f) => {
@@ -424,11 +444,28 @@ export default function BookShipmentPage() {
   useEffect(() => {
     const subservices = service?.pricing_tiers
       ?.find((pricingTier) => pricingTier.id === selectedTierId)?.sub_services || [];
-    setSelectedSubserviceId((current) => (
-      subservices.some((subservice) => subservice.id === current)
+    const carrierLayout = getCarrierNames(service).length > 0;
+    setSelectedSubserviceId((current) => {
+      if (carrierLayout) {
+        // weight x carrier: the carrier picks the sub-service, no default
+        return subservices.find((item) => item.name === selectedCarrier)?.id ?? null;
+      }
+      return subservices.some((subservice) => subservice.id === current)
         ? current
-        : subservices[0]?.id ?? null
-    ));
+        : subservices[0]?.id ?? null;
+    });
+  }, [service, selectedTierId, selectedCarrier]);
+
+  // Options priced per kg (heavy slabs) carry a minimum and maximum quantity.
+  useEffect(() => {
+    const picked = service?.pricing_tiers?.find((pricingTier) => pricingTier.id === selectedTierId);
+    if (picked?.min_quantity != null) {
+      setQuantity((current) => (
+        current >= picked.min_quantity && current <= (picked.max_quantity ?? Infinity)
+          ? current
+          : picked.min_quantity
+      ));
+    }
   }, [service, selectedTierId]);
 
   useEffect(() => {
@@ -475,14 +512,21 @@ export default function BookShipmentPage() {
     return (
       <div className="max-w-3xl mx-auto px-4 py-16 text-center">
         <h1 className="text-xl font-bold text-gray-900 mb-2">This service is not ready for booking</h1>
-        <Link to={`/services/${service.slug}`} className="text-brand-600 hover:underline">
-          Back to {service.name}
+        <Link to={`/services?direction=${service.route_direction}`} className="text-brand-600 hover:underline">
+          Back to services
         </Link>
       </div>
     );
   }
 
-  const effectiveQty = service.enable_quantity ? quantity : 1;
+  const carriers = getCarrierNames(service);
+  const carrierLayout = carriers.length > 0;
+  const weightTiers = carrierLayout
+    ? tiers.filter((t) => (t.sub_services || []).length > 0)
+    : tiers;
+  const limitedQty = tier?.max_quantity != null;
+  const usesQuantity = limitedQty || Boolean(service.enable_quantity);
+  const effectiveQty = usesQuantity ? quantity : 1;
   const currencyCode = route.currencyCode;
   const priceKey = currencyCode === "INR" ? "price_inr" : "price";
   const selectedPrice = subservices.length > 0
@@ -514,7 +558,20 @@ export default function BookShipmentPage() {
       fieldErrors[f.field_key] = `${f.label} is required.`;
     }
   });
-  const hasErrors = !tier || (subservices.length > 0 && !subservice) || selectedPrice == null ||
+  let quantityError = "";
+  if (usesQuantity) {
+    if (!Number.isInteger(quantity) || quantity < 1) {
+      quantityError = limitedQty ? "Enter the weight in kg." : "Enter a quantity of 1 or more.";
+    } else if (limitedQty && (quantity < tier.min_quantity || quantity > tier.max_quantity)) {
+      quantityError = `Enter a weight between ${tier.min_quantity} and ${tier.max_quantity} kg for this option.`;
+    }
+  }
+  const optionError = carrierLayout && !selectedCarrier ? "Choose a carrier."
+    : !tier ? (carrierLayout ? "Choose a weight." : "Choose a shipping option.")
+    : subservices.length > 0 && !subservice ? "Choose a delivery option."
+    : selectedPrice == null ? "Pricing is not set for this option yet. Please choose another option or contact us."
+    : quantityError;
+  const hasErrors = Boolean(optionError) ||
     Object.keys(senderErrors).length || Object.keys(receiverErrors).length ||
     Object.keys(fieldErrors).length;
 
@@ -560,14 +617,21 @@ export default function BookShipmentPage() {
       const firstParty = firstSender
         ? ["sender", ...firstSender]
         : firstReceiver ? ["receiver", ...firstReceiver] : null;
-      if (firstParty) {
+      if (optionError) {
+        toast.error(optionError);
+        const target = document.getElementById(
+          carrierLayout && !selectedCarrier ? "carrier-select"
+            : !tier ? (carrierLayout ? "weight-select" : "option-select")
+            : limitedQty ? "weight-kg" : "shipping-option"
+        );
+        target?.scrollIntoView({ behavior: "smooth", block: "center" });
+        target?.focus?.();
+      } else if (firstParty) {
         const [who, key, message] = firstParty;
         toast.error(`${who === "sender" ? "From" : "To"}: ${message}`);
         document.getElementById(`${who}-${key}`)?.focus();
       } else if (Object.keys(fieldErrors).length) {
         toast.error(Object.values(fieldErrors)[0]);
-      } else if (!tier || (subservices.length > 0 && !subservice) || selectedPrice == null) {
-        toast.error("Please choose a service option with a price before continuing.");
       } else {
         toast.error("Please fix the highlighted fields.");
       }
@@ -679,10 +743,14 @@ export default function BookShipmentPage() {
   return (
     <div className="min-h-[70vh] bg-gradient-to-b from-[#f4f8f5] via-white to-white px-4 py-8 sm:px-6 sm:py-12">
       <div className="mx-auto max-w-7xl">
+      <Link to={`/services?direction=${direction}`}
+        className="mb-5 inline-flex items-center gap-2 rounded-full border border-gray-200 bg-white px-4 py-2 text-sm font-semibold text-gray-600 transition hover:bg-gray-100">
+        <FiArrowLeft size={14} /> Back to Services
+      </Link>
       <div className="mb-7 flex flex-wrap items-end justify-between gap-4 rounded-[2rem] bg-gray-950 px-6 py-6 text-white shadow-xl shadow-gray-900/10 sm:px-8">
         <div>
           <p className="mb-2 text-xs font-bold uppercase tracking-[0.18em] text-emerald-200">
-            Booking · Step 03
+            Booking · Step 02
           </p>
           <h1 className="text-2xl font-extrabold tracking-tight sm:text-3xl">
             Tell us where it’s going.
@@ -698,47 +766,191 @@ export default function BookShipmentPage() {
         </div>
       </div>
       <form onSubmit={submit} noValidate
-        className="grid gap-3 items-start lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_290px]">
-          <p className="lg:col-span-3 flex items-center gap-2 text-sm font-bold text-brand-800">
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-100 text-xs">01</span>
-            Pickup and delivery contacts · {DIRECTIONS[direction].label}
-          </p>
-
-        <PartyCard letter="A" title="From" subtitle="Pickup contact and address" who="sender"
-          value={sender} onChange={(key, value) => setSender((current) => ({ ...current, [key]: value }))}
-          errors={senderErrors} showErrors={showErrors} country={route.from}
-          compact />
-        <PartyCard letter="B" title="To" subtitle="Recipient and delivery address" who="receiver"
-          value={receiver} onChange={(key, value) => setReceiver((current) => ({ ...current, [key]: value }))}
-          errors={receiverErrors} showErrors={showErrors} country={route.to}
-          compact />
-
-        {/* Sticky summary sidebar */}
-        <div className="card space-y-3 rounded-2xl border-gray-100 p-4 shadow-lg shadow-gray-900/[0.04] lg:sticky lg:top-24">
-          {subservices.length > 0 && (
-            <div>
-              <p className="font-semibold text-gray-900 text-sm mb-2">
-                {tier.tier_name} sub-services
-              </p>
-              <div className="space-y-1.5">
-                {subservices.map((option) => (
-                  <button key={option.id} type="button"
-                    onClick={() => setSelectedSubserviceId(option.id)}
-                    aria-pressed={subservice?.id === option.id}
-                    className={`w-full flex items-center gap-2 rounded-lg border-2 px-2 py-1.5 text-left transition-colors
-                      ${subservice?.id === option.id
-                        ? "border-brand-500 bg-brand-50"
-                        : "border-gray-200 hover:border-gray-300"}`}>
-                    <span>{option.icon || "📦"}</span>
-                    <span className="flex-1 text-xs font-semibold text-gray-900">{option.name}</span>
-                    <span className="text-xs font-bold text-gray-900">
-                      {money(option[priceKey], currencyCode)}
-                    </span>
-                  </button>
-                ))}
+        className="grid gap-6 items-start lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)]">
+        {/* Left: service information (moved here from the old option page) */}
+        <aside className="relative overflow-hidden rounded-[2rem] bg-gray-950 px-6 py-8 text-white shadow-xl shadow-gray-900/10 lg:sticky lg:top-24">
+          <div className="absolute -bottom-20 -right-5 h-48 w-48 rounded-full bg-brand-700/25 blur-3xl" />
+          <div className="relative">
+            <span className="mb-4 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-bold uppercase tracking-wide text-emerald-100">
+              <FiGlobe size={14} /> {route.label}
+            </span>
+            {service.badge_label && (
+              <span className="mb-4 ml-2 inline-block rounded-full bg-brand-400/15 px-3 py-1 text-[11px] font-bold tracking-wide text-emerald-100">
+                {service.badge_label}
+              </span>
+            )}
+            <h2 className="text-3xl font-extrabold tracking-tight">{service.name}</h2>
+            {service.tagline && <p className="mt-3 text-base font-semibold text-emerald-200">{service.tagline}</p>}
+            {service.description && <p className="mt-3 text-sm leading-6 text-white/70">{service.description}</p>}
+            {service.coverage_items?.length > 0 && (
+              <div className="mt-6 border-t border-white/10 pt-5">
+                <p className="mb-3 text-xs font-bold uppercase tracking-wide text-white/50">Included Coverage</p>
+                <ul className="space-y-2">
+                  {service.coverage_items.map((c) => (
+                    <li key={c.id} className="flex gap-2 text-sm text-white/85">
+                      <FiCheckCircle className="mt-0.5 shrink-0 text-emerald-300" /> {c.text}
+                    </li>
+                  ))}
+                </ul>
               </div>
+            )}
+            {service.restrictions?.length > 0 && (
+              <div className="mt-6 border-t border-white/10 pt-5">
+                <p className="mb-3 text-xs font-bold uppercase tracking-wide text-white/50">Not Allowed</p>
+                <ul className="space-y-2">
+                  {service.restrictions.map((r) => (
+                    <li key={r.id} className="flex gap-2 text-sm text-rose-200">
+                      <span aria-hidden="true">•</span> {r.text}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+        </aside>
+
+        <div className="space-y-4 min-w-0">
+          {/* Options: carrier + weight (or a single option list) */}
+          <div className="card rounded-2xl border-gray-100 p-5 shadow-lg shadow-gray-900/[0.04]">
+            <p className="mb-4 flex items-center gap-2 text-sm font-bold text-brand-800">
+              <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-100 text-xs">01</span>
+              Choose your shipping option
+            </p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {carrierLayout ? (
+                <>
+                  <div>
+                    <label htmlFor="carrier-select" className="mb-1 block text-xs font-semibold text-gray-600">Carrier</label>
+                    <select id="carrier-select" value={selectedCarrier}
+                      onChange={(e) => setSelectedCarrier(e.target.value)}
+                      className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm">
+                      <option value="">Select a carrier</option>
+                      {carriers.map((name) => <option key={name} value={name}>{name}</option>)}
+                    </select>
+                    {showErrors && !selectedCarrier && <p className="mt-1 text-xs text-red-600">Choose a carrier.</p>}
+                  </div>
+                  <div>
+                    <label htmlFor="weight-select" className="mb-1 block text-xs font-semibold text-gray-600">Weight</label>
+                    <select id="weight-select" value={selectedTierId ?? ""}
+                      onChange={(e) => setSelectedTierId(e.target.value ? Number(e.target.value) : null)}
+                      className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm">
+                      <option value="">Select a weight</option>
+                      {weightTiers.map((t) => {
+                        const sub = (t.sub_services || []).find((x) => x.name === selectedCarrier);
+                        const p = sub?.[priceKey];
+                        return (
+                          <option key={t.id} value={t.id}>
+                            {weightLabel(t.tier_name)}{p != null ? ` — ${money(p, currencyCode)}${t.max_quantity != null ? " per kg" : ""}` : ""}
+                          </option>
+                        );
+                      })}
+                    </select>
+                    {showErrors && !tier && <p className="mt-1 text-xs text-red-600">Choose a weight.</p>}
+                  </div>
+                </>
+              ) : (
+                <div className="sm:col-span-2">
+                  <label htmlFor="option-select" className="mb-1 block text-xs font-semibold text-gray-600">Shipping option</label>
+                  <select id="option-select" value={selectedTierId ?? ""}
+                    onChange={(e) => setSelectedTierId(e.target.value ? Number(e.target.value) : null)}
+                    className="w-full rounded-lg border border-gray-200 bg-white px-3 py-2.5 text-sm">
+                    <option value="">Select an option</option>
+                    {tiers.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.tier_name}{t[priceKey] != null && !(t.sub_services || []).length ? ` — ${money(t[priceKey], currencyCode)}` : ""}
+                      </option>
+                    ))}
+                  </select>
+                  {showErrors && !tier && <p className="mt-1 text-xs text-red-600">Choose a shipping option.</p>}
+                </div>
+              )}
             </div>
-          )}
+
+            {!carrierLayout && tier && subservices.length > 0 && (
+              <div id="shipping-option" tabIndex={-1} className="mt-4">
+                <p className="mb-2 text-xs font-semibold text-gray-600">{tier.tier_name} sub-services</p>
+                <div className="grid gap-1.5 sm:grid-cols-2">
+                  {subservices.map((option) => (
+                    <button key={option.id} type="button"
+                      onClick={() => setSelectedSubserviceId(option.id)}
+                      aria-pressed={subservice?.id === option.id}
+                      className={`flex items-center gap-2 rounded-lg border-2 px-2 py-1.5 text-left transition-colors
+                        ${subservice?.id === option.id ? "border-brand-500 bg-brand-50" : "border-gray-200 hover:border-gray-300"}`}>
+                      <span>{option.icon || "📦"}</span>
+                      <span className="flex-1 text-xs font-semibold text-gray-900">{option.name}</span>
+                      <span className="text-xs font-bold text-gray-900">{money(option[priceKey], currencyCode)}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {usesQuantity && tier && (
+              <div className="mt-4">
+                <label htmlFor="weight-kg" className="mb-1 block text-xs font-semibold text-gray-600">
+                  {limitedQty ? `Exact weight in kg (${tier.min_quantity}–${tier.max_quantity})` : "Quantity"}
+                </label>
+                <div className="inline-flex items-center gap-2">
+                  <button type="button" aria-label="Decrease"
+                    onClick={() => setQuantity((q) => Math.max(tier.min_quantity ?? 1, (Number(q) || 1) - 1))}
+                    className="rounded-lg border border-gray-200 p-2.5 hover:bg-gray-100"><FiMinus size={14} /></button>
+                  <input id="weight-kg" type="number" inputMode="numeric" min={tier.min_quantity ?? 1}
+                    max={tier.max_quantity ?? undefined} value={quantity}
+                    onChange={(e) => setQuantity(e.target.value === "" ? "" : parseInt(e.target.value, 10))}
+                    className="w-24 rounded-lg border border-gray-200 px-3 py-2 text-center text-sm" />
+                  <button type="button" aria-label="Increase"
+                    onClick={() => setQuantity((q) => Math.min(tier.max_quantity ?? Infinity, (Number(q) || 0) + 1))}
+                    className="rounded-lg border border-gray-200 p-2.5 hover:bg-gray-100"><FiPlus size={14} /></button>
+                </div>
+                {quantityError && <p className="mt-1 text-xs text-red-600">{quantityError}</p>}
+              </div>
+            )}
+
+            {tier && (!carrierLayout || selectedCarrier) && (
+              <div className="mt-4 flex items-center justify-between rounded-xl bg-brand-50 px-4 py-3">
+                <span className="text-sm text-gray-600">
+                  {carrierLayout ? `${selectedCarrier} · ${weightLabel(tier.tier_name)}` : tier.tier_name}
+                  {usesQuantity && effectiveQty > 1 ? ` × ${effectiveQty}${limitedQty ? " kg" : ""}` : ""}
+                </span>
+                <span className="text-lg font-extrabold text-brand-800">
+                  {selectedPrice == null ? "Price not set" : money(unitPrice * effectiveQty, currencyCode)}
+                </span>
+              </div>
+            )}
+            {showErrors && optionError && !quantityError && !(carrierLayout && !selectedCarrier) && tier && (
+              <p className="mt-2 text-xs text-red-600">{optionError}</p>
+            )}
+          </div>
+
+          <p className="flex items-center gap-2 text-sm font-bold text-brand-800">
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-brand-100 text-xs">02</span>
+            Pickup and delivery contacts
+          </p>
+          <div className="grid gap-3 xl:grid-cols-2">
+            <PartyCard letter="A" title="From" subtitle="Pickup contact and address" who="sender"
+              value={sender} onChange={(key, value) => setSender((current) => ({ ...current, [key]: value }))}
+              errors={senderErrors} showErrors={showErrors} country={route.from} compact />
+            <PartyCard letter="B" title="To" subtitle="Recipient and delivery address" who="receiver"
+              value={receiver} onChange={(key, value) => setReceiver((current) => ({ ...current, [key]: value }))}
+              errors={receiverErrors} showErrors={showErrors} country={route.to} compact />
+          </div>
+
+        {fields.length > 0 && (
+          <div className="card ">
+            <h2 className="font-bold text-gray-900 text-lg mb-4">{shortName} details</h2>
+            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
+              {fields.map((f) => (
+                <DynamicField key={f.id}
+                  field={f}
+                  value={fieldValues[f.field_key]}
+                  onChange={(v) => setField(f.field_key, v)}
+                  error={fieldErrors[f.field_key]} showError={showErrors} />
+              ))}
+            </div>
+          </div>
+        )}
+        {/* Summary */}
+        <div className="card space-y-3 rounded-2xl border-gray-100 p-4 shadow-lg shadow-gray-900/[0.04]">
           <p className="font-bold text-gray-900 text-sm">Your route</p>
           <div className="space-y-3 text-sm">
             <div className="flex items-start gap-3">
@@ -826,20 +1038,7 @@ export default function BookShipmentPage() {
           <p className="text-xs text-gray-400 text-center">No payment at this step</p>
         </div>
 
-        {fields.length > 0 && (
-          <div className="card lg:col-span-3">
-            <h2 className="font-bold text-gray-900 text-lg mb-4">{shortName} details</h2>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
-              {fields.map((f) => (
-                <DynamicField key={f.id}
-                  field={f}
-                  value={fieldValues[f.field_key]}
-                  onChange={(v) => setField(f.field_key, v)}
-                  error={fieldErrors[f.field_key]} showError={showErrors} />
-              ))}
-            </div>
-          </div>
-        )}
+        </div>
       </form>
 
       </div>

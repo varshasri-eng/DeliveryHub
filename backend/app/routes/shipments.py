@@ -280,7 +280,7 @@ def _validate_booking(data):
 
     # ── quantity ─────────────────────────────────────────────
     quantity = 1
-    if service.enable_quantity:
+    if service.enable_quantity or _tier_has_limits(tier):
         try:
             quantity = int(data.get("quantity", 1))
         except (TypeError, ValueError):
@@ -288,6 +288,11 @@ def _validate_booking(data):
         if quantity <= 0:
             return None, None, None, None, None, None, None, (
                 jsonify({"error": "Quantity must be a positive integer."}), 400
+            )
+        limit_error = _tier_limit_error(tier, quantity)
+        if limit_error:
+            return None, None, None, None, None, None, None, (
+                jsonify({"error": limit_error}), 400
             )
 
     # ── sender / receiver ────────────────────────────────────
@@ -359,6 +364,20 @@ def _validate_booking(data):
     return service, tier, sub_service, quantity, field_values, sender, receiver, None
 
 
+def _tier_has_limits(tier):
+    """Per-kg slabs carry a min/max quantity (kg)."""
+    return tier is not None and tier.max_quantity is not None
+
+
+def _tier_limit_error(tier, quantity):
+    if not _tier_has_limits(tier):
+        return None
+    low = tier.min_quantity or 1
+    if quantity < low or quantity > tier.max_quantity:
+        return f"Enter a weight between {low} and {tier.max_quantity} kg for this option."
+    return None
+
+
 def _price_booking(tier, sub_service, quantity, currency_code):
     price = (
         sub_service.price_inr if currency_code == "INR" else sub_service.price
@@ -395,10 +414,12 @@ def _offer_pricing_context(data):
     ).first()
     if not tier:
         return None, "Selected pricing tier does not belong to this service."
-    if not service.enable_quantity:
+    if not (service.enable_quantity or _tier_has_limits(tier)):
         quantity = 1
     elif quantity < 1:
         return None, "Quantity must be a positive integer."
+    elif _tier_limit_error(tier, quantity):
+        return None, _tier_limit_error(tier, quantity)
 
     sub_service = None
     if tier.sub_services:
