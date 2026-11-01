@@ -743,17 +743,8 @@ def create_guest_shipment():
 
 
 # ── PAYMENT PROOF SUBMISSION ──────────────────────────────────
-@shipments_bp.route("/<int:shipment_id>/invoice/payment", methods=["POST"])
-@login_required
-def submit_payment_proof(customer, shipment_id):
-    shipment = Shipment.query.filter_by(id=shipment_id, customer_id=customer.id).first()
-    if not shipment:
-        return jsonify({"error": "Shipment not found."}), 404
-
-    invoice = shipment.invoice
-    if not invoice:
-        return jsonify({"error": "This shipment does not have an invoice yet."}), 404
-
+def _save_payment_proof(invoice):
+    """Validate + store the uploaded proof/note on an invoice. Returns a Flask response."""
     if invoice.status not in {"issued", "payment_rejected"}:
         return jsonify({
             "error": (
@@ -769,6 +760,8 @@ def submit_payment_proof(customer, shipment_id):
 
     if not has_file and not note:
         return jsonify({"error": "Please upload a screenshot or add a note."}), 400
+    if len(note) > 1000:
+        return jsonify({"error": "Note must be at most 1000 characters."}), 400
 
     screenshot_path = invoice.payment_screenshot_path
 
@@ -805,10 +798,54 @@ def submit_payment_proof(customer, shipment_id):
     }), 200
 
 
+@shipments_bp.route("/<int:shipment_id>/invoice/payment", methods=["POST"])
+@login_required
+def submit_payment_proof(customer, shipment_id):
+    shipment = Shipment.query.filter_by(id=shipment_id, customer_id=customer.id).first()
+    if not shipment:
+        return jsonify({"error": "Shipment not found."}), 404
+    if not shipment.invoice:
+        return jsonify({"error": "This shipment does not have an invoice yet."}), 404
+    return _save_payment_proof(shipment.invoice)
+
+
+# Guests (not signed in) submit proof from the tracking page using the shipment number.
+@shipments_bp.route("/track/<shipment_number>/invoice/payment", methods=["POST"])
+def submit_tracked_payment_proof(shipment_number):
+    shipment = Shipment.query.filter_by(shipment_number=shipment_number).first()
+    if not shipment:
+        return jsonify({"error": "No shipment found with that number."}), 404
+    if not shipment.invoice:
+        return jsonify({"error": "This shipment does not have an invoice yet."}), 404
+    return _save_payment_proof(shipment.invoice)
+
+
+def _public_invoice(invoice):
+    """Invoice fields safe to show on the public tracking page (no proof file path or notes)."""
+    if not invoice:
+        return None
+    return {
+        "invoice_number": invoice.invoice_number,
+        "status": invoice.status,
+        "issued_at": invoice.issued_at.isoformat() if invoice.issued_at else None,
+        "paid_at": invoice.paid_at.isoformat() if invoice.paid_at else None,
+        "subtotal_amount": float(invoice.subtotal_amount or 0),
+        "offer_code": invoice.offer_code,
+        "offer_discount_amount": float(invoice.offer_discount_amount or 0),
+        "manual_discount_amount": float(invoice.manual_discount_amount or 0),
+        "total_amount": float(invoice.total_amount or 0),
+        "payment_rejection_reason": invoice.payment_rejection_reason,
+        "payment_submitted_at": (
+            invoice.payment_submitted_at.isoformat() if invoice.payment_submitted_at else None
+        ),
+        "items": [item.to_dict() for item in invoice.items],
+    }
+
+
 # ── PUBLIC TRACKING ──────────────────────────────────────────
 # No auth required — anyone with the shipment number can check status.
 # Returns only non-sensitive fields: never addresses, phone numbers,
-# or who booked it. The shipment_number itself is an unguessable
+# or who booked it (the invoice amounts/line items are included on purpose). The shipment_number itself is an unguessable
 # random token (see generate_shipment_number), which is the only
 # protection this needs for a first version.
 @shipments_bp.route("/track/<shipment_number>", methods=["GET"])
@@ -826,5 +863,7 @@ def track_shipment(shipment_number):
             "status": shipment.status,
             "created_at": shipment.created_at.isoformat() if shipment.created_at else None,
             "updated_at": shipment.updated_at.isoformat() if shipment.updated_at else None,
+            "currency_code": shipment.currency_code or "USD",
+            "invoice": _public_invoice(shipment.invoice),
         }
     }), 200

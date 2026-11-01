@@ -36,3 +36,14 @@ export const submitPaymentProof = (shipmentId, { file, note } = {}) => {
     headers: { "Content-Type": "multipart/form-data" },
   });
 };
+
+// Guests (not signed in) submit payment proof from the tracking page.
+export const submitTrackedPaymentProof = (shipmentNumber, { file, note } = {}) => {
+  const formData = new FormData();
+  if (file) formData.append("screenshot", file);
+  if (note) formData.append("note", note);
+
+  return api.post(`/shipments/track/${encodeURIComponent(shipmentNumber)}/invoice/payment`, formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+};
