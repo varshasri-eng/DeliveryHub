@@ -41,6 +41,19 @@ export const getAdminShipment = (id) =>
 export const updateShipmentStatus = (id, status) =>
   api.put(`/admin/shipments/${id}/status`, { status });
 
+// ── FedEx hand-off (label upload -> tracking number) ───────────
+export const setShipmentTracking = (id, { file, trackingNumber } = {}) => {
+  const formData = new FormData();
+  if (file) formData.append("label", file);
+  if (trackingNumber && trackingNumber.trim()) formData.append("tracking_number", trackingNumber.trim());
+  return api.post(`/admin/shipments/${id}/tracking`, formData, {
+    headers: { "Content-Type": "multipart/form-data" },
+  });
+};
+
+export const clearShipmentTracking = (id) =>
+  api.delete(`/admin/shipments/${id}/tracking`);
+
 // ── Invoice / billing ─────────────────────────────────────────
 export const raiseShipmentInvoice = (shipmentId, data) =>
   api.post(`/admin/shipments/${shipmentId}/invoice`, data);

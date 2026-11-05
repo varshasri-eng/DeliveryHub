@@ -290,6 +290,18 @@ export default function TrackShipmentPage() {
                   );
                 })}
               </div>
+              {shipment.status === "in_transit" && shipment.tracking_url && (
+                <div className="mt-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-brand-200 bg-brand-50 p-4">
+                  <div>
+                    <p className="text-sm font-bold text-brand-900">Your parcel is on its way with FedEx</p>
+                    <p className="mt-0.5 text-xs text-gray-600">FedEx tracking number: {shipment.tracking_number}</p>
+                  </div>
+                  <a href={shipment.tracking_url} target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 rounded-xl bg-brand-700 px-4 py-2.5 text-sm font-bold text-white transition-all hover:bg-brand-800">
+                    Track on FedEx <FiArrowRight size={15} />
+                  </a>
+                </div>
+              )}
               {shipment.created_at && (
                 <p className="mt-4 text-xs text-gray-400">
                   Booked {new Date(shipment.created_at).toLocaleDateString()}

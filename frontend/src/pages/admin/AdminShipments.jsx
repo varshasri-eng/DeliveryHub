@@ -1,10 +1,15 @@
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import { formatMoney } from "../../utils/money";
-import { FiPackage, FiX } from "react-icons/fi";
+import { resolveMediaUrl } from "../../utils/media";
+import { downloadInvoice } from "../../utils/invoiceDownload";
+import { useBranding } from "../../context/BrandingContext";
+import InvoiceDocument from "../../components/InvoiceDocument";
+import { FiDownload, FiExternalLink, FiPackage, FiPaperclip, FiX } from "react-icons/fi";
 import {
   getAdminShipments, updateShipmentStatus,
   raiseShipmentInvoice, updateShipmentInvoice, verifyShipmentPayment, rejectShipmentPayment,
+  setShipmentTracking, clearShipmentTracking,
 } from "../../api/admin";
 
 const STATUS_OPTIONS = ["requested", "picked_up", "in_transit", "delivered", "cancelled"];
@@ -13,25 +18,38 @@ const STATUS_LABELS = {
   delivered: "Delivered", cancelled: "Cancelled",
 };
 
-const TABS = [
-  { key: "needs_invoice", label: "Needs Invoice" },
-  { key: "pending_payment", label: "Pending Payment" },
-  { key: "verified", label: "Verified" },
-];
+// The order's journey: Requested -> (invoice raised, paid, verified) -> FedEx label -> Picked up -> In transit -> Delivered
+const TABS = STATUS_OPTIONS.map((key) => ({ key, label: STATUS_LABELS[key] }));
 
-function invoiceBucket(shipment) {
-  const status = shipment.invoice?.status;
-  if (!shipment.invoice) return "needs_invoice";
-  if (status === "payment_verified") return "verified";
-  return "pending_payment"; // issued | payment_submitted | payment_rejected
+const INVOICE_CHIP = {
+  none:              { label: "Invoice: not raised",     cls: "bg-gray-100 text-gray-600" },
+  issued:            { label: "Invoice: awaiting payment", cls: "bg-amber-50 text-amber-700" },
+  payment_submitted: { label: "Payment submitted - verify", cls: "bg-blue-50 text-blue-700" },
+  payment_rejected:  { label: "Payment rejected",        cls: "bg-red-50 text-red-700" },
+  payment_verified:  { label: "Paid & verified",         cls: "bg-green-50 text-green-700" },
+};
+
+function nextStep(s) {
+  const inv = s.invoice?.status;
+  if (s.status === "cancelled") return "";
+  if (s.status === "delivered") return "Completed.";
+  if (!s.invoice) return "Next: review the order, add any discount and raise the invoice.";
+  if (inv === "issued") return "Waiting for the customer to pay the invoice.";
+  if (inv === "payment_submitted") return "Next: check the payment proof and verify (or reject) it.";
+  if (inv === "payment_rejected") return "Waiting for the customer to submit payment again.";
+  if (!s.tracking_number) return "Next: upload the FedEx label (the tracking number is read from it).";
+  if (s.status === "in_transit") return "On its way - mark Delivered when FedEx confirms delivery.";
+  return "Next: set the status to In Transit so the customer sees the FedEx tracking link.";
 }
 
 export default function AdminShipments() {
   const [shipments, setShipments] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState("needs_invoice");
+  const [tab, setTab] = useState("requested");
   const [selected, setSelected] = useState(null);
   const [invoiceEditorShipment, setInvoiceEditorShipment] = useState(null);
+  const [invoiceViewShipment, setInvoiceViewShipment] = useState(null);
+  const [trackingShipment, setTrackingShipment] = useState(null);
 
   const load = () => {
     setLoading(true);
@@ -44,22 +62,30 @@ export default function AdminShipments() {
   useEffect(load, []);
 
   const counts = TABS.reduce((acc, t) => {
-    acc[t.key] = shipments.filter((s) => invoiceBucket(s) === t.key).length;
+    acc[t.key] = shipments.filter((s) => (s.status || "requested") === t.key).length;
     return acc;
   }, {});
 
-  const filtered = shipments.filter((s) => invoiceBucket(s) === tab);
+  const filtered = shipments.filter((s) => (s.status || "requested") === tab);
 
   const refreshOne = (updated) => {
     setShipments((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
     setSelected((prev) => (prev && prev.id === updated.id ? updated : prev));
+    setInvoiceViewShipment((prev) => (prev && prev.id === updated.id ? updated : prev));
+    setTrackingShipment((prev) => (prev && prev.id === updated.id ? updated : prev));
   };
 
   const handleStatusChange = async (shipment, status) => {
+    if (status === shipment.status) return;
+    if (status === "in_transit" && !shipment.tracking_number &&
+        !window.confirm("No FedEx tracking number has been added yet, so the customer will not see a tracking link. Continue anyway?")) {
+      return;
+    }
     try {
       const res = await updateShipmentStatus(shipment.id, status);
       refreshOne(res.data.shipment);
-      toast.success("Status updated.");
+      setTab(status); // follow the order to its new tab
+      toast.success(`Moved to ${STATUS_LABELS[status]}.`);
     } catch (err) {
       toast.error(err.response?.data?.error || "Could not update status.");
     }
@@ -76,7 +102,6 @@ export default function AdminShipments() {
         : await raiseShipmentInvoice(shipment.id, draft);
       refreshOne({ ...shipment, invoice: res.data.invoice });
       toast.success(invoice ? "Invoice updated." : "Invoice raised.");
-      setTab("pending_payment");
       setInvoiceEditorShipment(null);
     } catch (err) {
       toast.error(err.response?.data?.error || "Could not save invoice.");
@@ -107,9 +132,11 @@ export default function AdminShipments() {
   return (
     <div>
       <h1 className="text-2xl font-bold text-gray-900 mb-1">Shipments</h1>
-      <p className="text-gray-500 text-sm mb-6">Manage bookings, fulfillment status, and billing.</p>
+      <p className="text-gray-500 text-sm mb-6">
+        Follow each order from request to delivery: invoice, payment, FedEx label and status.
+      </p>
 
-      <div className="flex gap-2 mb-6">
+      <div className="flex flex-wrap gap-2 mb-6">
         {TABS.map((t) => (
           <button key={t.key} onClick={() => setTab(t.key)}
             className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-semibold transition-colors
@@ -129,14 +156,16 @@ export default function AdminShipments() {
           <FiPackage className="mx-auto text-gray-300 mb-3" size={32} />
           <p className="font-semibold text-gray-700">Nothing here</p>
           <p className="text-gray-400 text-sm mt-1">
-            {tab === "needs_invoice" ? "New shipments without an invoice yet will show up here."
-              : tab === "pending_payment" ? "Shipments awaiting payment or verification show up here."
-              : "Fully paid shipments show up here."}
+            {tab === "requested" ? "New customer orders show up here."
+              : `No shipments are marked ${STATUS_LABELS[tab]} right now.`}
           </p>
         </div>
       ) : (
         <div className="space-y-3">
-          {filtered.map((s) => (
+          {filtered.map((s) => {
+            const chip = INVOICE_CHIP[s.invoice ? s.invoice.status : "none"] || INVOICE_CHIP.none;
+            const hint = nextStep(s);
+            return (
             <div key={s.id} className="card">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0 cursor-pointer" onClick={() => setSelected(s)}>
@@ -156,6 +185,7 @@ export default function AdminShipments() {
                   <select
                     value={s.status}
                     onChange={(e) => handleStatusChange(s, e.target.value)}
+                    aria-label="Shipment status"
                     className="mt-1.5 text-xs font-semibold border border-gray-200 rounded-full px-2 py-1 capitalize"
                   >
                     {STATUS_OPTIONS.map((st) => (
@@ -165,11 +195,33 @@ export default function AdminShipments() {
                 </div>
               </div>
 
-              <div className="border-t border-gray-50 mt-3 pt-3 flex items-center justify-between">
-                <button onClick={() => setSelected(s)}
-                  className="text-xs font-semibold text-gray-500 hover:text-gray-900">
-                  View details
-                </button>
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${chip.cls}`}>{chip.label}</span>
+                <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${s.tracking_number ? "bg-purple-50 text-purple-700" : "bg-gray-100 text-gray-500"}`}>
+                  {s.tracking_number ? `FedEx ${s.tracking_number}` : "FedEx label: not added"}
+                </span>
+              </div>
+              {hint && <p className="mt-2 text-xs text-gray-500">{hint}</p>}
+
+              <div className="border-t border-gray-50 mt-3 pt-3 flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-3">
+                  <button onClick={() => setSelected(s)}
+                    className="text-xs font-semibold text-gray-500 hover:text-gray-900">
+                    View details
+                  </button>
+                  {s.invoice && (
+                    <button onClick={() => setInvoiceViewShipment(s)}
+                      className="text-xs font-semibold text-brand-700 hover:underline">
+                      View / Download invoice
+                    </button>
+                  )}
+                  {s.status !== "cancelled" && (
+                    <button onClick={() => setTrackingShipment(s)}
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-purple-700 hover:underline">
+                      <FiPaperclip size={12} /> {s.tracking_number ? "FedEx label" : "Upload FedEx label"}
+                    </button>
+                  )}
+                </div>
 
                 {!s.invoice ? (
                   <button onClick={() => handleRaiseInvoice(s)}
@@ -187,27 +239,28 @@ export default function AdminShipments() {
                       Verify Payment
                     </button>
                   </div>
-                ) : (
-                  <div className="flex items-center gap-3">
-                    {s.invoice.status === "issued" && (
-                      <button onClick={() => setInvoiceEditorShipment({ shipment: s, invoice: s.invoice })}
-                        className="text-xs font-semibold text-brand-700 hover:underline">
-                        Preview / Edit Invoice
-                      </button>
-                    )}
-                    <span className="text-xs font-semibold text-gray-400 capitalize">
-                      {s.invoice.status.replace("_", " ")}
-                    </span>
-                  </div>
-                )}
+                ) : s.invoice.status === "issued" ? (
+                  <button onClick={() => setInvoiceEditorShipment({ shipment: s, invoice: s.invoice })}
+                    className="text-xs font-semibold text-brand-700 hover:underline">
+                    Preview / Edit Invoice
+                  </button>
+                ) : null}
               </div>
             </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
       {selected && (
         <ShipmentDetailModal shipment={selected} onClose={() => setSelected(null)} />
+      )}
+      {invoiceViewShipment && (
+        <AdminInvoiceModal shipment={invoiceViewShipment} onClose={() => setInvoiceViewShipment(null)} />
+      )}
+      {trackingShipment && (
+        <TrackingModal shipment={trackingShipment} onClose={() => setTrackingShipment(null)}
+          onSaved={refreshOne} />
       )}
       {invoiceEditorShipment && (
         <InvoiceEditorModal
@@ -217,6 +270,179 @@ export default function AdminShipments() {
           onSave={handleSaveInvoice}
         />
       )}
+    </div>
+  );
+}
+
+function ProofBlock({ invoice }) {
+  const url = invoice?.payment_screenshot_path ? resolveMediaUrl(invoice.payment_screenshot_path) : null;
+  const isPdf = url && /\.pdf(\?|$)/i.test(url);
+  return (
+    <div className="rounded-xl border border-gray-200 bg-gray-50 p-4">
+      <p className="text-xs font-bold uppercase tracking-wide text-gray-500">Payment</p>
+      <p className="mt-1 text-sm font-semibold capitalize text-gray-900">
+        {(invoice?.status || "issued").replace(/_/g, " ")}
+        {invoice?.paid_at ? ` · verified ${new Date(invoice.paid_at).toLocaleDateString()}` : ""}
+      </p>
+      {invoice?.payment_submitted_at && (
+        <p className="text-xs text-gray-500">Proof submitted {new Date(invoice.payment_submitted_at).toLocaleString()}</p>
+      )}
+      {url && (isPdf
+        ? <a href={url} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-brand-700 underline">
+            <FiExternalLink size={13} /> Open payment proof (PDF)
+          </a>
+        : <a href={url} target="_blank" rel="noopener noreferrer">
+            <img src={url} alt="Payment proof" className="mt-3 max-h-56 rounded-lg border border-gray-200" />
+          </a>)}
+      {invoice?.payment_note && <p className="mt-2 text-sm text-gray-600">"{invoice.payment_note}"</p>}
+      {invoice?.payment_rejection_reason && (
+        <p className="mt-2 text-sm text-red-600">Rejected: {invoice.payment_rejection_reason}</p>
+      )}
+      {!url && !invoice?.payment_note && invoice?.status === "issued" && (
+        <p className="mt-2 text-sm text-gray-500">The customer has not submitted payment yet.</p>
+      )}
+    </div>
+  );
+}
+
+function AdminInvoiceModal({ shipment, onClose }) {
+  const { settings } = useBranding();
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[92vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 sticky top-0 bg-white z-10 print:hidden">
+          <div>
+            <h2 className="font-bold text-gray-900">Invoice</h2>
+            <p className="text-xs text-gray-400 mt-0.5">{shipment.invoice?.invoice_number} · {shipment.shipment_number}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button onClick={() => downloadInvoice(shipment, settings.site_name)}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-gray-900 text-white text-sm font-semibold hover:bg-gray-700">
+              <FiDownload size={14} /> Download
+            </button>
+            <button onClick={() => window.print()}
+              className="px-4 py-2 rounded-lg border border-gray-200 text-gray-700 text-sm font-semibold hover:bg-gray-50">
+              Print
+            </button>
+            <button onClick={onClose} aria-label="Close"
+              className="px-3 py-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">✕</button>
+          </div>
+        </div>
+        <InvoiceDocument shipment={shipment}>
+          <ProofBlock invoice={shipment.invoice} />
+        </InvoiceDocument>
+      </div>
+    </div>
+  );
+}
+
+function TrackingModal({ shipment, onClose, onSaved }) {
+  const [file, setFile] = useState(null);
+  const [number, setNumber] = useState("");
+  const [needsNumber, setNeedsNumber] = useState(false);
+  const [saving, setSaving] = useState(false);
+
+  const save = async (event) => {
+    event.preventDefault();
+    if (!file && !number.trim()) {
+      toast.error("Choose the FedEx label file or type the tracking number.");
+      return;
+    }
+    setSaving(true);
+    try {
+      const res = await setShipmentTracking(shipment.id, { file, trackingNumber: number });
+      onSaved(res.data.shipment);
+      toast.success(res.data.detected_from_file
+        ? `Tracking number ${res.data.shipment.tracking_number} read from the label.`
+        : "Tracking saved.");
+      setFile(null);
+      setNumber("");
+      setNeedsNumber(false);
+    } catch (err) {
+      if (err.response?.data?.needs_number) setNeedsNumber(true);
+      toast.error(err.response?.data?.error || "Could not save tracking.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const remove = async () => {
+    if (!window.confirm("Remove the tracking number and label from this shipment?")) return;
+    try {
+      const res = await clearShipmentTracking(shipment.id);
+      onSaved(res.data.shipment);
+      toast.success("Tracking removed.");
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Could not remove tracking.");
+    }
+  };
+
+  const labelUrl = shipment.label_path ? resolveMediaUrl(shipment.label_path) : null;
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4">
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+          <div>
+            <h2 className="font-bold text-gray-900">FedEx label</h2>
+            <p className="text-xs text-gray-400 mt-0.5">{shipment.shipment_number}</p>
+          </div>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><FiX size={20} /></button>
+        </div>
+        <div className="p-6 space-y-5 text-sm">
+          {shipment.tracking_number ? (
+            <div className="rounded-xl border border-purple-200 bg-purple-50 p-4">
+              <p className="text-xs font-bold uppercase tracking-wide text-purple-700">Current tracking number</p>
+              <p className="mt-1 text-lg font-extrabold text-gray-900">{shipment.tracking_number}</p>
+              <div className="mt-2 flex flex-wrap gap-3">
+                <a href={shipment.tracking_url} target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-1 font-semibold text-purple-700 underline">
+                  <FiExternalLink size={13} /> Open on FedEx
+                </a>
+                {labelUrl && (
+                  <a href={labelUrl} target="_blank" rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1 font-semibold text-purple-700 underline">
+                    <FiPaperclip size={13} /> View uploaded label
+                  </a>
+                )}
+                <button type="button" onClick={remove} className="font-semibold text-red-600 hover:underline">Remove</button>
+              </div>
+              <p className="mt-2 text-xs text-gray-500">
+                The customer sees this link on the Track page only while the status is In Transit.
+              </p>
+            </div>
+          ) : (
+            <p className="text-gray-500">
+              Upload the FedEx label (PDF or image). For a PDF the 12-digit tracking number next to “TRK#” is read automatically.
+            </p>
+          )}
+
+          <form onSubmit={save} className="space-y-3">
+            <div>
+              <label htmlFor="label-file" className="mb-1 block text-xs font-semibold text-gray-600">
+                {shipment.tracking_number ? "Replace label (PDF, PNG, JPG, WEBP, max 8 MB)" : "Label file (PDF, PNG, JPG, WEBP, max 8 MB)"}
+              </label>
+              <input id="label-file" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp"
+                onChange={(e) => setFile(e.target.files?.[0] || null)}
+                className="block w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-brand-50 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-brand-700" />
+            </div>
+            <div>
+              <label htmlFor="label-number" className="mb-1 block text-xs font-semibold text-gray-600">
+                Tracking number {needsNumber ? "(required for this file)" : "(optional for PDFs, needed for images)"}
+              </label>
+              <input id="label-number" inputMode="numeric" maxLength={20} value={number}
+                onChange={(e) => setNumber(e.target.value)} placeholder="e.g. 879507453190"
+                className={`input ${needsNumber ? "border-red-300" : ""}`} />
+            </div>
+            <div className="flex justify-end gap-2 pt-1">
+              <button type="button" onClick={onClose} className="btn-secondary">Close</button>
+              <button disabled={saving} className="btn-primary disabled:opacity-50">
+                {saving ? "Saving…" : "Save tracking"}
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
     </div>
   );
 }
@@ -471,14 +697,19 @@ function ShipmentDetailModal({ shipment, onClose }) {
               <p className="text-gray-700">{shipment.notes}</p>
             </div>
           )}
-          {shipment.invoice?.payment_screenshot_path && (
+          {shipment.tracking_number && (
             <div>
-              <p className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-2">Payment proof</p>
-              <img src={shipment.invoice.payment_screenshot_path} alt="Payment proof"
-                className="max-h-56 rounded-lg border border-gray-200" />
-              {shipment.invoice.payment_note && (
-                <p className="text-gray-600 mt-2">"{shipment.invoice.payment_note}"</p>
-              )}
+              <p className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-2">FedEx tracking</p>
+              <a href={shipment.tracking_url} target="_blank" rel="noopener noreferrer"
+                className="font-semibold text-purple-700 underline">{shipment.tracking_number}</a>
+            </div>
+          )}
+          {shipment.invoice && (
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wide text-gray-400 mb-2">
+                Invoice {shipment.invoice.invoice_number}
+              </p>
+              <ProofBlock invoice={shipment.invoice} />
             </div>
           )}
         </div>

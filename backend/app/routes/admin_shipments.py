@@ -4,6 +4,9 @@ Admin Shipment Management Routes
 GET  /api/admin/shipments                      - list all shipments, optional ?status= filter  [read]
 GET  /api/admin/shipments/<id>                  - one shipment, full detail                     [read]
 PUT  /api/admin/shipments/<id>/status           - update status (requested/picked_up/etc.)       [write]
+POST /api/admin/shipments/<id>/tracking         - upload the FedEx label (pdf/image) and/or enter
+                                                  the 12-digit tracking number                   [write]
+DELETE /api/admin/shipments/<id>/tracking       - clear the tracking number + label              [write]
 
 -- Billing (same issued -> payment_submitted -> verified/rejected flow
    as the original app, now pointing at shipments instead of orders) --
@@ -12,16 +15,47 @@ PUT  /api/admin/invoices/<id>/verify            - mark payment verified         
 PUT  /api/admin/invoices/<id>/reject            - mark payment rejected (with reason) [write]
 """
 
+import io
+import os
+import re
+import secrets
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation, ROUND_HALF_UP
 
-from flask import Blueprint, request, jsonify
+from flask import Blueprint, request, jsonify, current_app
+from werkzeug.utils import secure_filename
 from app import db
 from app.models.shipment import Shipment, VALID_SHIPMENT_STATUSES
 from app.models.invoice import Invoice, InvoiceItem
 from app.utils.auth import permission_required
 
 admin_shipments_bp = Blueprint("admin_shipments", __name__)
+
+
+
+LABEL_SUBDIR = os.path.join("static", "uploads", "fedex_labels")
+LABEL_EXTENSIONS = {"pdf", "png", "jpg", "jpeg", "webp"}
+LABEL_MAX_BYTES = 8 * 1024 * 1024
+TRACKING_RE = re.compile(r"^\d{12}(\d{3})?$")  # FedEx: 12 digits (15 for some services)
+
+
+def _extract_tracking_from_pdf(data):
+    """Best-effort: find the number printed next to 'TRK#' on a FedEx label PDF.
+    Returns the digits or None. Never raises."""
+    try:
+        from pypdf import PdfReader  # optional dependency
+        reader = PdfReader(io.BytesIO(data))
+        text = "\n".join((page.extract_text() or "") for page in reader.pages)
+    except Exception:
+        return None
+    # FedEx prints the number in groups of four: "8795 0745 3190".
+    # Exclude the REF number by only accepting digit groups of 4 (not one long 12-digit run).
+    grouped = re.findall(r"(?<!\d)(\d{4})\s(\d{4})\s(\d{4})(?!\d)", text)
+    if len(grouped) == 1:
+        return "".join(grouped[0])
+    if len(grouped) > 1:
+        return "".join(grouped[0])
+    return None
 
 
 def _generate_invoice_number():
@@ -167,6 +201,74 @@ def update_status(customer, shipment_id):
     db.session.commit()
     return jsonify({"message": "Status updated.", "shipment": shipment.to_dict()}), 200
 
+
+
+# ── FEDEX HAND-OFF ───────────────────────────────────────────
+@admin_shipments_bp.route("/<int:shipment_id>/tracking", methods=["POST"])
+@permission_required("write")
+def set_tracking(customer, shipment_id):
+    shipment = Shipment.query.get(shipment_id)
+    if not shipment:
+        return jsonify({"error": "Shipment not found."}), 404
+
+    typed = re.sub(r"\s+", "", request.form.get("tracking_number") or "")
+    file = request.files.get("label")
+    has_file = bool(file and file.filename)
+    if not has_file and not typed:
+        return jsonify({"error": "Upload the FedEx label or enter the tracking number."}), 400
+
+    label_path = shipment.label_path
+    detected = None
+    if has_file:
+        ext = file.filename.rsplit(".", 1)[-1].lower() if "." in file.filename else ""
+        if ext not in LABEL_EXTENSIONS:
+            return jsonify({"error": "Label must be a PDF or an image (png/jpg/jpeg/webp)."}), 400
+        data = file.read()
+        if len(data) > LABEL_MAX_BYTES:
+            return jsonify({"error": "Label must be under 8MB."}), 400
+        if ext == "pdf":
+            detected = _extract_tracking_from_pdf(data)
+
+        number = typed or detected
+        if not number:
+            return jsonify({
+                "error": "Could not read a tracking number from this file. Type the 12-digit number and upload again.",
+                "needs_number": True,
+            }), 422
+        if not TRACKING_RE.match(number):
+            return jsonify({"error": "The tracking number must be 12 digits."}), 400
+
+        upload_dir = os.path.join(current_app.root_path, LABEL_SUBDIR)
+        os.makedirs(upload_dir, exist_ok=True)
+        filename = secure_filename(f"label_{shipment.id}_{secrets.token_hex(6)}.{ext}")
+        with open(os.path.join(upload_dir, filename), "wb") as fh:
+            fh.write(data)
+        label_path = f"/static/uploads/fedex_labels/{filename}"
+    else:
+        number = typed
+        if not TRACKING_RE.match(number):
+            return jsonify({"error": "The tracking number must be 12 digits."}), 400
+
+    shipment.tracking_number = number
+    shipment.label_path = label_path
+    db.session.commit()
+    return jsonify({
+        "message": "Tracking saved.",
+        "detected_from_file": bool(detected and not typed),
+        "shipment": shipment.to_dict(),
+    }), 200
+
+
+@admin_shipments_bp.route("/<int:shipment_id>/tracking", methods=["DELETE"])
+@permission_required("write")
+def clear_tracking(customer, shipment_id):
+    shipment = Shipment.query.get(shipment_id)
+    if not shipment:
+        return jsonify({"error": "Shipment not found."}), 404
+    shipment.tracking_number = None
+    shipment.label_path = None
+    db.session.commit()
+    return jsonify({"message": "Tracking cleared.", "shipment": shipment.to_dict()}), 200
 
 # ── BILLING ──────────────────────────────────────────────────
 @admin_shipments_bp.route("/<int:shipment_id>/invoice", methods=["POST"])

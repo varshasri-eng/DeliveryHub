@@ -30,7 +30,7 @@ from urllib.request import Request, urlopen
 from flask import Blueprint, request, jsonify, current_app
 from werkzeug.utils import secure_filename
 from app import db
-from app.models.shipment import Shipment, generate_shipment_number
+from app.models.shipment import Shipment, generate_shipment_number, fedex_tracking_url
 from app.models.service_type import ServiceType, ServicePricingTier, ServiceSubservice
 from app.models.offer_code import OfferCode
 from app.utils.auth import login_required
@@ -845,8 +845,8 @@ def _public_invoice(invoice):
 # ── PUBLIC TRACKING ──────────────────────────────────────────
 # No auth required — anyone with the shipment number can check status.
 # Returns only non-sensitive fields: never addresses, phone numbers,
-# or who booked it (the invoice amounts/line items are included on purpose). The shipment_number itself is an unguessable
-# random token (see generate_shipment_number), which is the only
+# or who booked it (the invoice amounts/line items are included on purpose).
+# The shipment_number itself is an unguessable random token (see generate_shipment_number), which is the only
 # protection this needs for a first version.
 @shipments_bp.route("/track/<shipment_number>", methods=["GET"])
 def track_shipment(shipment_number):
@@ -864,6 +864,9 @@ def track_shipment(shipment_number):
             "created_at": shipment.created_at.isoformat() if shipment.created_at else None,
             "updated_at": shipment.updated_at.isoformat() if shipment.updated_at else None,
             "currency_code": shipment.currency_code or "USD",
+            # The FedEx link is only shown to customers while the parcel is in transit.
+            "tracking_number": shipment.tracking_number if shipment.status == "in_transit" else None,
+            "tracking_url": fedex_tracking_url(shipment.tracking_number) if shipment.status == "in_transit" else None,
             "invoice": _public_invoice(shipment.invoice),
         }
     }), 200

@@ -9,6 +9,8 @@ import { useBranding } from "../../context/BrandingContext";
 import { resolveMediaUrl } from "../../utils/media";
 import { formatMoney } from "../../utils/money";
 import { downloadShipmentSummary } from "../../utils/shipmentSummary";
+import { downloadInvoice } from "../../utils/invoiceDownload";
+import InvoiceDocument from "../../components/InvoiceDocument";
 import toast from "react-hot-toast";
 
 const STATUS_STYLE = {
@@ -164,6 +166,13 @@ export default function Shipments() {
                       <p className="text-gray-600">{shipment.receiver_phone}</p>
                       <p className="text-gray-600">{shipment.receiver_address}</p>
                     </div>
+                    {shipment.status === "in_transit" && shipment.tracking_url && (
+                      <div className="sm:col-span-2 rounded-lg border border-purple-200 bg-purple-50 p-3 text-sm text-purple-800">
+                        On its way with FedEx · tracking {shipment.tracking_number}{" "}
+                        <a href={shipment.tracking_url} target="_blank" rel="noopener noreferrer"
+                          className="font-semibold underline">Track on FedEx</a>
+                      </div>
+                    )}
                     <div className="sm:col-span-2 text-xs text-gray-500">
                       Tracking number: <span className="font-bold text-gray-800">{shipment.shipment_number}</span>
                       {" · "}Booked {new Date(shipment.created_at).toLocaleString()}
@@ -264,9 +273,13 @@ function InvoiceModal({ shipment, paymentSettings, onClose, onPrint, onPaymentSu
             <p className="text-xs text-gray-400 mt-0.5">{invoice?.invoice_number}</p>
           </div>
           <div className="flex items-center gap-2">
+            <button onClick={() => downloadInvoice(shipment, settings.site_name)}
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-gray-900 text-white text-sm font-semibold hover:bg-gray-700">
+              <FiDownload size={14} /> Download
+            </button>
             <button onClick={onPrint}
-              className="px-4 py-2 rounded-lg bg-gray-900 text-white text-sm font-semibold hover:bg-gray-700">
-              Print / Download
+              className="px-4 py-2 rounded-lg border border-gray-200 text-gray-700 text-sm font-semibold hover:bg-gray-50">
+              Print
             </button>
             <button onClick={onClose}
               className="px-3 py-2 rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50">
@@ -275,8 +288,8 @@ function InvoiceModal({ shipment, paymentSettings, onClose, onPrint, onPaymentSu
           </div>
         </div>
 
-        {invoice && (
-          <div className="p-6 pb-0 print:hidden">
+        <InvoiceDocument shipment={shipment}>
+          {invoice && (
             <PaymentSection
               invoice={invoice}
               paymentSettings={paymentSettings}
@@ -290,123 +303,8 @@ function InvoiceModal({ shipment, paymentSettings, onClose, onPrint, onPaymentSu
               submitting={submitting}
               onSubmit={handleSubmitPayment}
             />
-          </div>
-        )}
-
-        <div id="shipment-invoice" className="p-8 text-gray-900 bg-white">
-          <div className="flex justify-between items-start pb-6 mb-6 border-b-2 border-gray-200">
-            <div>
-              <h1 className="text-2xl font-extrabold">{settings.site_name}</h1>
-              <p className="text-sm text-gray-500 mt-1">Shipment Invoice</p>
-            </div>
-            <div className="text-right">
-              <h2 className="text-xl font-extrabold">INVOICE</h2>
-              <p className="text-sm text-gray-500 mt-2">
-                Invoice #: <strong className="text-gray-900">{invoice?.invoice_number}</strong>
-              </p>
-              <p className="text-sm text-gray-500">
-                Date: <strong className="text-gray-900">
-                  {invoice?.issued_at
-                    ? new Date(invoice.issued_at).toLocaleDateString()
-                    : new Date(shipment.created_at).toLocaleDateString()}
-                </strong>
-              </p>
-              <p className="text-sm text-gray-500">
-                Shipment #: <strong className="text-gray-900">{shipment.shipment_number}</strong>
-              </p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-6 mb-7">
-            <div className="bg-gray-50 rounded-xl p-4">
-              <p className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-2">Sender</p>
-              <p className="font-semibold text-gray-900">{shipment.sender_name}</p>
-              <p className="text-sm text-gray-500 mt-1">{shipment.sender_phone}</p>
-              <p className="text-sm text-gray-500">{shipment.sender_address}</p>
-            </div>
-            <div className="bg-gray-50 rounded-xl p-4">
-              <p className="text-xs font-bold uppercase tracking-wide text-gray-500 mb-2">Receiver</p>
-              <p className="font-semibold text-gray-900">{shipment.receiver_name}</p>
-              <p className="text-sm text-gray-500 mt-1">{shipment.receiver_phone}</p>
-              <p className="text-sm text-gray-500">{shipment.receiver_address}</p>
-            </div>
-          </div>
-
-          <div className="mb-6 overflow-x-auto">
-            <table className="w-full border-collapse">
-              <thead>
-                <tr className="bg-gray-50">
-                  <th className="text-left text-xs uppercase tracking-wide text-gray-500 font-semibold p-3 border-b-2 border-gray-200">Service</th>
-                  <th className="text-center text-xs uppercase tracking-wide text-gray-500 font-semibold p-3 border-b-2 border-gray-200">Qty</th>
-                  <th className="text-right text-xs uppercase tracking-wide text-gray-500 font-semibold p-3 border-b-2 border-gray-200">Unit Price</th>
-                  <th className="text-right text-xs uppercase tracking-wide text-gray-500 font-semibold p-3 border-b-2 border-gray-200">Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(invoice?.items?.length ? invoice.items : [{
-                  description: `${shipment.service_name} — ${shipment.tier_name}${
-                    shipment.sub_service_name ? ` — ${shipment.sub_service_name}` : ""
-                  }`,
-                  quantity: shipment.quantity,
-                  unit_price: shipment.unit_price,
-                  line_total: shipment.subtotal_price ?? shipment.total_price,
-                }]).map((item, index) => (
-                  <tr key={item.id || `${item.description}-${index}`}>
-                    <td className="p-3 text-sm font-medium border-b border-gray-100">{item.description}</td>
-                    <td className="p-3 text-sm text-center border-b border-gray-100">{item.quantity}</td>
-                    <td className="p-3 text-sm text-right border-b border-gray-100">
-                      {formatMoney(item.unit_price, shipment.currency_code)}
-                    </td>
-                    <td className="p-3 text-sm text-right font-semibold border-b border-gray-100">
-                      {formatMoney(item.line_total, shipment.currency_code)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          <div className="flex justify-end mb-8">
-            <div className="w-72 space-y-2 text-sm">
-              <div className="flex justify-between">
-                <span>Subtotal</span>
-                <span>{formatMoney(invoice?.subtotal_amount ?? shipment.subtotal_price ?? shipment.total_price, shipment.currency_code)}</span>
-              </div>
-              {Number(invoice?.offer_discount_amount || 0) > 0 && (
-                <div className="flex justify-between text-green-700">
-                  <span>Offer code {invoice.offer_code}</span>
-                  <span>−{formatMoney(invoice.offer_discount_amount, shipment.currency_code)}</span>
-                </div>
-              )}
-              {Number(invoice?.manual_discount_amount || 0) > 0 && (
-                <div className="flex justify-between text-green-700">
-                  <span>Additional discount</span>
-                  <span>−{formatMoney(invoice.manual_discount_amount, shipment.currency_code)}</span>
-                </div>
-              )}
-              <div className="flex justify-between pt-3 mt-2 border-t-2 border-gray-200 font-extrabold text-lg">
-                <span>Total</span>
-                <span>{formatMoney(total, shipment.currency_code)}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="border-t border-gray-200 pt-5 flex justify-between items-end">
-            <div>
-              <p className="font-semibold text-sm">Thank you for shipping with {settings.site_name}!</p>
-              <p className="text-xs text-gray-500 mt-1">
-                Invoice status:{" "}
-                <span className="text-green-700 font-semibold capitalize">
-                  {invoice?.status || "issued"}
-                </span>
-              </p>
-            </div>
-            <div className="text-right text-xs text-gray-400">
-              <p>{settings.site_name}</p>
-              <p>Shipment Invoice</p>
-            </div>
-          </div>
-        </div>
+          )}
+        </InvoiceDocument>
       </div>
     </div>
   );

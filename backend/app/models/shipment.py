@@ -5,6 +5,12 @@ from app import db
 VALID_SHIPMENT_STATUSES = {"requested", "picked_up", "in_transit", "delivered", "cancelled"}
 
 
+def fedex_tracking_url(tracking_number):
+    if not tracking_number:
+        return None
+    return f"https://www.fedex.com/fedextrack/?trknbr={tracking_number}"
+
+
 def generate_shipment_number():
     return "DH-" + secrets.token_hex(4).upper()
 
@@ -48,6 +54,10 @@ class Shipment(db.Model):
 
     status = db.Column(db.String(30), default="requested")
 
+    # FedEx hand-off: tracking number (read from the uploaded label) + the label file itself
+    tracking_number = db.Column(db.String(20))
+    label_path = db.Column(db.String(500))
+
     created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc),
                            onupdate=lambda: datetime.now(timezone.utc))
@@ -87,6 +97,9 @@ class Shipment(db.Model):
             "field_values": self.field_values,
             "notes": self.notes,
             "status": self.status,
+            "tracking_number": self.tracking_number,
+            "tracking_url": fedex_tracking_url(self.tracking_number),
+            "label_path": self.label_path,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
         if include_invoice and self.invoice:

@@ -8,3 +8,5 @@ Werkzeug==3.0.3
 PyJWT==2.8.0
 email-validator==2.1.1
 openpyxl
+pypdf==5.9.0
+ 
