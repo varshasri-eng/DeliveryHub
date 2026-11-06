@@ -35,6 +35,20 @@ class ServiceType(db.Model):
                              order_by="ServiceField.display_order",
                              cascade="all, delete-orphan")
 
+    def _starting_price(self):
+        """Lowest price a customer can pay for this service (in its route's currency), or None."""
+        use_inr = self.route_direction == "IN_TO_US"
+        prices = []
+        for tier in self.pricing_tiers:
+            if tier.max_quantity is not None:
+                continue  # per-kg slabs are not a "starting" price
+            if tier.sub_services:
+                prices += [(s.price_inr if use_inr else s.price) for s in tier.sub_services]
+            else:
+                prices.append(tier.price_inr if use_inr else tier.price)
+        prices = [float(p) for p in prices if p is not None and float(p) > 0]
+        return min(prices) if prices else None
+
     def to_dict(self, include_details=False):
         data = {
             "id": self.id,
@@ -48,6 +62,8 @@ class ServiceType(db.Model):
             "enable_quantity": self.enable_quantity,
             "is_active": self.is_active,
             "display_order": self.display_order,
+            "currency_code": "INR" if self.route_direction == "IN_TO_US" else "USD",
+            "starting_price": self._starting_price(),
         }
         if include_details:
             data["coverage_items"] = [c.to_dict() for c in self.coverage_items]

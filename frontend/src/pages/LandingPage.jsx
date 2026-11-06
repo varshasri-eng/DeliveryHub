@@ -1,11 +1,16 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { FiArrowRight, FiCheckCircle, FiClock, FiGlobe, FiPackage, FiShield, FiTruck } from "react-icons/fi";
+import { FiArrowRight, FiCheckCircle, FiClock, FiGlobe, FiMessageCircle, FiPackage, FiPhone, FiShield, FiTruck } from "react-icons/fi";
 import { getServices } from "../api/services";
 import api from "../api/client";
 import StaticPageContent from "../components/StaticPageContent";
 import Reveal from "../components/Reveal";
 import { useBranding } from "../context/BrandingContext";
+import { formatMoney } from "../utils/money";
+
+const WHATSAPP_URL = "https://wa.me/15107146946";
+const PHONE_DISPLAY = "+1 510 714 6946";
+const PHONE_TEL = "+15107146946";
 
 const DIRECTIONS = [
   { id: "US_TO_IN", label: "United States to India", summary: "Ship from the U.S. to India" },
@@ -13,9 +18,10 @@ const DIRECTIONS = [
 ];
 
 const HOW_IT_WORKS = [
-  { title: "Choose your route", description: "Pick United States to India or India to United States." },
-  { title: "Select a service", description: "Compare the services and delivery options for that route, with prices shown." },
-  { title: "Book and track", description: "Submit your details, then follow your shipment with its reference number." },
+  { title: "Get a quote", description: "Pick your route and service, then see the price for your weight or option before you book." },
+  { title: "Enter pickup and delivery details", description: "Tell us who is sending, who is receiving and where. We use the sender address for pickup." },
+  { title: "We ship with our courier partners", description: "Your shipment travels with an international courier such as FedEx, and we coordinate it for you." },
+  { title: "Track until delivery", description: "Follow your shipment with its reference number on the Track Shipment page." },
 ];
 
 const FEATURES = [
@@ -99,10 +105,10 @@ export default function LandingPage() {
               <FiGlobe size={15} /> {settings.site_name} · U.S. ↔ India
             </div>
             <h1 className="max-w-2xl text-4xl font-extrabold leading-[1.08] tracking-[-0.04em] text-gray-950 sm:text-5xl lg:text-6xl">
-              {settings.hero_title || "Ship across borders. Stay close to what matters."}
+              {settings.hero_title || "Ship between the USA and India. Fast, secure and affordable."}
             </h1>
             <p className="mt-6 max-w-xl text-base leading-7 text-gray-600 sm:text-lg">
-              {settings.hero_subtitle || "Choose your route, compare shipping options, and book your U.S.–India shipment with clear details at every step."}
+              {settings.hero_subtitle || "Documents, personal parcels and cargo, with the price shown before you book and tracking after."}
             </p>
 
             <div className="mt-9 max-w-2xl">
@@ -134,14 +140,24 @@ export default function LandingPage() {
                   onClick={() => navigate(`/services?direction=${direction}`)}
                   className="btn-primary inline-flex items-center gap-2 rounded-full !px-6 !py-3 text-sm shadow-lg shadow-brand-800/15 transition-all hover:-translate-y-0.5 disabled:opacity-50 sm:text-base"
                 >
-                  {settings.hero_cta || "Explore shipping options"} <FiArrowRight size={18} />
+                  {settings.hero_cta || "Get a quote"} <FiArrowRight size={18} />
                 </button>
                 <button
                   onClick={() => navigate("/track")}
-                  className="rounded-full px-5 py-3 text-sm font-bold text-gray-700 transition-colors hover:bg-white hover:text-brand-800 sm:text-base"
+                  className="rounded-full border border-gray-300 bg-white px-5 py-3 text-sm font-bold text-gray-800 transition-colors hover:bg-gray-100 sm:text-base"
                 >
-                  Track a shipment
+                  Track shipment
                 </button>
+              </div>
+              <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
+                <a href={WHATSAPP_URL} target="_blank" rel="noopener noreferrer"
+                  className="inline-flex items-center gap-2 font-semibold text-emerald-700 hover:underline">
+                  <FiMessageCircle size={16} /> Chat on WhatsApp
+                </a>
+                <a href={`tel:${settings.contact_phone ? settings.contact_phone.replace(/[^\d+]/g, "") : PHONE_TEL}`}
+                  className="inline-flex items-center gap-2 font-semibold text-gray-700 hover:underline">
+                  <FiPhone size={15} /> {settings.contact_phone || PHONE_DISPLAY}
+                </a>
               </div>
               {direction && (
                 <p aria-live="polite" className="mt-3 text-xs font-semibold text-brand-800">
@@ -238,6 +254,49 @@ export default function LandingPage() {
         </div>
       </section>
 
+      {!servicesLoading && !serviceLoadError && services.some((service) => service.starting_price != null) && (
+        <Reveal as="section" className="mx-auto max-w-7xl px-4 pt-20 sm:px-6">
+          <div className="mb-8 max-w-2xl">
+            <p className="text-xs font-bold uppercase tracking-[0.18em] text-brand-700">Transparent pricing</p>
+            <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-gray-950">Starting prices</h2>
+            <p className="mt-2 text-sm text-gray-500">
+              The lowest price for each service. The exact price depends on the weight or option you choose, and is shown before you book.
+            </p>
+          </div>
+          <div className="grid gap-6 lg:grid-cols-2">
+            {DIRECTIONS.map((option) => {
+              const list = services.filter((service) => service.route_direction === option.id && service.starting_price != null);
+              if (!list.length) return null;
+              return (
+                <div key={option.id} className="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm">
+                  <p className="mb-4 flex items-center gap-2 font-bold text-gray-950">
+                    <FiArrowRight className={option.id === "IN_TO_US" ? "rotate-180 text-brand-700" : "text-brand-700"} size={16} />
+                    {option.label}
+                  </p>
+                  <ul className="divide-y divide-gray-100">
+                    {list.map((service) => (
+                      <li key={service.id} className="flex items-center justify-between gap-3 py-3">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-gray-900">{service.icon || "📦"} {service.name}</p>
+                          {service.tagline && <p className="truncate text-xs text-gray-500">{service.tagline}</p>}
+                        </div>
+                        <div className="flex flex-shrink-0 items-center gap-3">
+                          <span className="text-sm text-gray-500">From <strong className="text-base text-gray-950">{formatMoney(service.starting_price, service.currency_code)}</strong></span>
+                          <button onClick={() => navigate(`/services/${service.slug}`)}
+                            className="rounded-full bg-gray-950 px-4 py-1.5 text-xs font-bold text-white transition-colors hover:bg-gray-700">
+                            Book
+                          </button>
+                        </div>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              );
+            })}
+          </div>
+        </Reveal>
+      )}
+
       <Reveal as="section" className="mx-auto max-w-7xl px-4 py-20 sm:px-6">
         <div className="mb-8 flex flex-wrap items-end justify-between gap-4">
           <div>
@@ -268,7 +327,7 @@ export default function LandingPage() {
           </div>
         ) : availableServices.length ? (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {availableServices.slice(0, 3).map((service, index) => (
+            {availableServices.slice(0, 6).map((service, index) => (
               <Reveal as="button" delay={index * 90}
                 key={service.id}
                 onClick={() => navigate(`/services/${service.slug}`)}
@@ -277,6 +336,9 @@ export default function LandingPage() {
                 <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-50 text-3xl transition-transform duration-300 group-hover:scale-110">{service.icon || "📦"}</span>
                 <span className="mt-5 block font-bold text-gray-950">{service.name}</span>
                 <span className="mt-2 block min-h-10 text-sm leading-6 text-gray-500">{service.tagline || "View service details and delivery options."}</span>
+                {service.starting_price != null && (
+                  <span className="mt-3 block text-sm text-gray-500">From <strong className="text-gray-900">{formatMoney(service.starting_price, service.currency_code)}</strong></span>
+                )}
                 <span className="mt-5 inline-flex items-center gap-2 text-sm font-bold text-brand-700">
                   Explore service <FiArrowRight className="transition-transform group-hover:translate-x-1" />
                 </span>
@@ -315,9 +377,9 @@ export default function LandingPage() {
       <Reveal as="section" className="mx-auto max-w-7xl px-4 py-20 sm:px-6">
         <div className="mb-10 max-w-2xl">
           <p className="text-xs font-bold uppercase tracking-[0.18em] text-brand-700">How it works</p>
-          <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-gray-950">Three steps to your booking</h2>
+          <h2 className="mt-3 text-3xl font-extrabold tracking-tight text-gray-950">From quote to delivery in four steps</h2>
         </div>
-        <ol className="grid gap-5 md:grid-cols-3">
+        <ol className="grid gap-5 sm:grid-cols-2 lg:grid-cols-4">
           {HOW_IT_WORKS.map((step, index) => (
             <li key={step.title}
               className="rounded-3xl border border-gray-100 bg-white p-6 shadow-sm transition duration-300 ease-out hover:-translate-y-1 hover:border-gray-200 hover:bg-gray-100 hover:shadow-lg motion-reduce:transform-none motion-reduce:transition-none">
