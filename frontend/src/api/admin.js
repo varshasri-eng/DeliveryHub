@@ -148,3 +148,7 @@ export const deletePaymentQr = () =>
   api.delete("/payment-settings/qr");
 
 // TEMP stub so CustomerDetail.jsx can load; remove once that page is fixed
+
+// ── Leads (every unique sender / receiver) ─────────────────────
+export const getAdminLeads = (params = {}) => api.get("/admin/leads", { params });
+export const getAdminLead = (id) => api.get(`/admin/leads/${id}`);

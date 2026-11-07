@@ -40,6 +40,7 @@ import ServiceDetailPage from "./pages/ServiceDetailPage";
 import BookShipmentPage from "./pages/BookShipmentPage";
 import AdminPages from "./pages/admin/AdminPages";
 import AdminShipments from "./pages/admin/AdminShipments";
+import AdminLeads from "./pages/admin/AdminLeads";
 import AdminServices from "./pages/admin/AdminServices";
 import AdminOffers from "./pages/admin/AdminOffers";
 import TrackShipmentPage from "./pages/TrackShipmentPage";
@@ -122,6 +123,7 @@ export default function App() {
           <Route path="staff"         element={<StaffManagement />} />
           <Route path="branding"      element={<AdminBrandingPage />} />
           <Route path="payment-settings" element={<PaymentSettingsPage />} />
+          <Route path="leads" element={<AdminLeads />} />
           <Route path="shipments" element={<AdminShipments />} />
           <Route path="services" element={<AdminServices />} />
           <Route path="offer-codes" element={<AdminOffers />} />

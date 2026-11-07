@@ -54,6 +54,10 @@ class Shipment(db.Model):
 
     status = db.Column(db.String(30), default="requested")
 
+    # The two people on this shipment, as unique leads (see app/models/lead.py)
+    sender_lead_id = db.Column(db.Integer, db.ForeignKey("leads.id", ondelete="SET NULL"), index=True)
+    receiver_lead_id = db.Column(db.Integer, db.ForeignKey("leads.id", ondelete="SET NULL"), index=True)
+
     # FedEx hand-off: tracking number (read from the uploaded label) + the label file itself
     tracking_number = db.Column(db.String(20))
     label_path = db.Column(db.String(500))
@@ -66,6 +70,8 @@ class Shipment(db.Model):
     pricing_tier = db.relationship("ServicePricingTier")
     sub_service = db.relationship("ServiceSubservice")
     offer = db.relationship("OfferCode")
+    sender_lead = db.relationship("Lead", foreign_keys=[sender_lead_id])
+    receiver_lead = db.relationship("Lead", foreign_keys=[receiver_lead_id])
 
     def to_dict(self, include_invoice=True):
         data = {
@@ -97,6 +103,8 @@ class Shipment(db.Model):
             "field_values": self.field_values,
             "notes": self.notes,
             "status": self.status,
+            "sender_lead_id": self.sender_lead_id,
+            "receiver_lead_id": self.receiver_lead_id,
             "tracking_number": self.tracking_number,
             "tracking_url": fedex_tracking_url(self.tracking_number),
             "label_path": self.label_path,

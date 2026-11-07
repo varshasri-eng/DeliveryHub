@@ -34,6 +34,7 @@ from app.models.shipment import Shipment, generate_shipment_number, fedex_tracki
 from app.models.service_type import ServiceType, ServicePricingTier, ServiceSubservice
 from app.models.offer_code import OfferCode
 from app.utils.auth import login_required
+from app.utils.leads import upsert_lead
 
 shipments_bp = Blueprint("shipments", __name__)
 
@@ -212,6 +213,24 @@ def _validate_route_details(data, direction):
                 )
             }), 400
     return None
+
+
+def _attach_leads(shipment, data):
+    """Record the sender and receiver as leads (best effort: never blocks a booking)."""
+    for role in ("sender", "receiver"):
+        try:
+            lead = upsert_lead(
+                name=data.get(f"{role}_name"),
+                phone=data.get(f"{role}_phone"),
+                country=data.get(f"{role}_country"),
+                city=data.get(f"{role}_city"),
+                province=data.get(f"{role}_province"),
+                postal_code=data.get(f"{role}_postal_code"),
+                address=data.get(f"{role}_address"),
+            )
+            setattr(shipment, f"{role}_lead", lead)
+        except Exception:  # noqa: BLE001
+            current_app.logger.exception("Could not record %s lead", role)
 
 
 def _validate_booking(data):
@@ -649,6 +668,7 @@ def create_shipment(customer):
         notes=(data.get("notes") or "").strip() or None,
         status="requested",
     )
+    _attach_leads(shipment, data)
     db.session.add(shipment)
     db.session.commit()
 
@@ -733,6 +753,7 @@ def create_guest_shipment():
         notes=(data.get("notes") or "").strip() or None,
         status="requested",
     )
+    _attach_leads(shipment, data)
     db.session.add(shipment)
     db.session.commit()
 
