@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from "react-router-dom";
+import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { BrandingProvider } from "./context/BrandingContext";
 import WhatsAppPlaceholder from "./components/WhatsAppPlaceholder";
@@ -44,6 +44,12 @@ import AdminLeads from "./pages/admin/AdminLeads";
 import AdminServices from "./pages/admin/AdminServices";
 import AdminOffers from "./pages/admin/AdminOffers";
 import TrackShipmentPage from "./pages/TrackShipmentPage";
+
+// The WhatsApp chat button is for visitors and customers, not the admin panel
+function ChatButton() {
+  const { pathname } = useLocation();
+  return pathname.startsWith("/admin") ? null : <WhatsAppPlaceholder />;
+}
 
 const Loader = () => (
   <div className="flex items-center justify-center h-screen text-gray-400">
@@ -134,7 +140,7 @@ export default function App() {
         <Route path="*"  element={<Navigate to="/" replace />} />
 
       </Routes>
-      <WhatsAppPlaceholder />
+      <ChatButton />
       </>
       </BrandingProvider>
     </AuthProvider>

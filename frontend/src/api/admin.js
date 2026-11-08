@@ -136,16 +136,17 @@ export const deleteField = (fieldId) =>
 export const updatePaymentSettings = (data) =>
   api.put("/payment-settings", data);
 
-export const uploadPaymentQr = (file) => {
+export const uploadPaymentQr = (file, route) => {
   const formData = new FormData();
   formData.append("qr", file);
+  formData.append("route", route);
   return api.post("/payment-settings/qr", formData, {
     headers: { "Content-Type": "multipart/form-data" },
   });
 };
 
-export const deletePaymentQr = () =>
-  api.delete("/payment-settings/qr");
+export const deletePaymentQr = (route) =>
+  api.delete("/payment-settings/qr", { params: { route } });
 
 // TEMP stub so CustomerDetail.jsx can load; remove once that page is fixed
 

@@ -9,8 +9,17 @@ import {
   deletePaymentQr,
 } from "../../api/admin";
 
+const ROUTES = [
+  { key: "IN_TO_US", label: "India → USA", suffix: "in_us", note: "Customers pay in INR" },
+  { key: "US_TO_IN", label: "USA → India", suffix: "us_in", note: "Customers pay in USD" },
+];
+
 export default function PaymentSettingsPage() {
-  const [qrCodeUrl, setQrCodeUrl] = useState("");
+  const [route, setRoute] = useState("IN_TO_US");
+  const [all, setAll] = useState(null); // everything the API returned
+  const suffix = ROUTES.find((r) => r.key === route).suffix;
+  const routeLabel = ROUTES.find((r) => r.key === route).label;
+  const qrCodeUrl = all?.[`qr_code_url_${suffix}`] || "";
   const [instructions, setInstructions] = useState("");
   const [updatedAt, setUpdatedAt] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -27,8 +36,8 @@ export default function PaymentSettingsPage() {
   const load = () => {
     getPaymentSettings()
       .then((res) => {
-        setQrCodeUrl(res.data.qr_code_url || "");
-        setInstructions(res.data.instructions || "");
+        setAll(res.data);
+        setInstructions(res.data[`instructions_${suffix}`] || "");
         setUpdatedAt(res.data.updated_at || null);
       })
       .catch(() => toast.error("Could not load payment settings."))
@@ -36,6 +45,18 @@ export default function PaymentSettingsPage() {
   };
 
   useEffect(() => { load(); }, []);
+
+  // Switching direction loads that direction's instructions into the box
+  useEffect(() => {
+    if (all) setInstructions(all[`instructions_${suffix}`] || "");
+    setManualUrl("");
+  }, [route]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const applySettings = (settings) => {
+    if (!settings) return;
+    setAll(settings);
+    setUpdatedAt(settings.updated_at || null);
+  };
 
   const handleFileChange = async (e) => {
     const file = e.target.files?.[0];
@@ -45,10 +66,9 @@ export default function PaymentSettingsPage() {
 
     setUploadingQr(true);
     try {
-      const res = await uploadPaymentQr(file);
-      setQrCodeUrl(res.data.settings?.qr_code_url || "");
-      setUpdatedAt(res.data.settings?.updated_at || null);
-      toast.success("QR code uploaded.");
+      const res = await uploadPaymentQr(file, route);
+      applySettings(res.data.settings);
+      toast.success(`${routeLabel} QR code uploaded.`);
     } catch (err) {
       toast.error(err.response?.data?.error || "Could not upload QR code.");
     } finally {
@@ -57,14 +77,13 @@ export default function PaymentSettingsPage() {
   };
 
   const handleRemoveQr = async () => {
-    if (!window.confirm("Remove the current QR code? Customers won't see one until you upload a new one.")) {
+    if (!window.confirm(`Remove the ${routeLabel} QR code? Those customers will fall back to the shared QR (if any) until you upload a new one.`)) {
       return;
     }
     setRemovingQr(true);
     try {
-      const res = await deletePaymentQr();
-      setQrCodeUrl(res.data.settings?.qr_code_url || "");
-      setUpdatedAt(res.data.settings?.updated_at || null);
+      const res = await deletePaymentQr(route);
+      applySettings(res.data.settings);
       toast.success("QR code removed.");
     } catch (err) {
       toast.error(err.response?.data?.error || "Could not remove QR code.");
@@ -76,8 +95,8 @@ export default function PaymentSettingsPage() {
   const handleSaveInstructions = async () => {
     setSavingInstructions(true);
     try {
-      const res = await updatePaymentSettings({ instructions: instructions.trim() });
-      setUpdatedAt(res.data.settings?.updated_at || null);
+      const res = await updatePaymentSettings({ route, instructions: instructions.trim() });
+      applySettings(res.data.settings);
       toast.success("Instructions saved.");
     } catch (err) {
       toast.error(err.response?.data?.error || "Could not save instructions.");
@@ -89,9 +108,8 @@ export default function PaymentSettingsPage() {
   const handleSaveManualUrl = async () => {
     setSavingManualUrl(true);
     try {
-      const res = await updatePaymentSettings({ qr_code_url: manualUrl.trim() });
-      setQrCodeUrl(res.data.settings?.qr_code_url || "");
-      setUpdatedAt(res.data.settings?.updated_at || null);
+      const res = await updatePaymentSettings({ route, qr_code_url: manualUrl.trim() });
+      applySettings(res.data.settings);
       setManualUrl("");
       toast.success("QR URL saved.");
     } catch (err) {
@@ -107,8 +125,27 @@ export default function PaymentSettingsPage() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Payment Settings</h1>
         <p className="text-sm text-gray-500 mt-1">
-          The QR code and instructions shown to customers on every invoice.
+          Each direction has its own QR code and instructions, shown on that shipment's invoice.
         </p>
+      </div>
+
+      {/* Direction tabs */}
+      <div className="flex gap-2 mb-4">
+        {ROUTES.map((r) => (
+          <button
+            key={r.key}
+            onClick={() => setRoute(r.key)}
+            className={`px-4 py-2 rounded-xl text-sm font-semibold border transition-colors
+              ${route === r.key
+                ? "bg-brand-600 text-white border-brand-600"
+                : "bg-white text-gray-600 border-gray-200 hover:bg-gray-50"}`}
+          >
+            {r.label}
+            <span className={`block text-[11px] font-normal ${route === r.key ? "text-white/80" : "text-gray-400"}`}>
+              {r.note}
+            </span>
+          </button>
+        ))}
       </div>
 
       <div className="bg-white border border-gray-100 rounded-2xl p-6">
@@ -119,7 +156,7 @@ export default function PaymentSettingsPage() {
             {/* QR code */}
             <div>
               <label className="text-sm font-medium text-gray-700 mb-2 block">
-                QR code
+                {routeLabel} QR code
               </label>
 
               <div className="flex items-start gap-5">
@@ -191,12 +228,12 @@ export default function PaymentSettingsPage() {
             {/* Instructions */}
             <div>
               <label className="text-sm font-medium text-gray-700 mb-1.5 block">
-                Instructions (optional)
+                {routeLabel} instructions (optional)
               </label>
               <textarea
                 value={instructions}
                 onChange={(e) => setInstructions(e.target.value)}
-                placeholder="e.g. India: UPI payment instructions; U.S.: Zelle or bank transfer instructions"
+                placeholder={route === "IN_TO_US" ? "e.g. UPI ID and payment steps (INR)" : "e.g. Zelle or bank transfer details (USD)"}
                 className="w-full px-3 py-2.5 border border-gray-200 rounded-xl
                            text-sm outline-none focus:ring-2 focus:ring-brand-100 h-24 resize-none"
               />

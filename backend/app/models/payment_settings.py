@@ -1,8 +1,9 @@
 """
-PaymentSettings — singleton row holding the payment QR code and any
-instructions shown to customers on their invoice. Deliberately
-separate from SiteSettings/branding, since the QR is admin-managed
-payment info, not a branding asset.
+PaymentSettings — singleton row holding the payment QR codes and instructions
+shown to customers on their invoice. There is one set per route direction
+(US_TO_IN: customer pays in USD, IN_TO_US: customer pays in INR); the original
+qr_code_url / instructions columns are kept as a fallback when a direction has
+nothing of its own yet.
 """
 
 from datetime import datetime, timezone
@@ -14,14 +15,17 @@ class PaymentSettings(db.Model):
 
     id = db.Column(db.Integer, primary_key=True)
 
-    # URL to the QR code image, same pattern as SiteSettings.logo_url —
-    # the admin hosts/points to an image rather than uploading one
-    # directly, consistent with how branding images already work.
+    # Fallback (used when a direction has no QR / instructions of its own)
     qr_code_url = db.Column(db.String(500), nullable=True)
-
-    # Optional free text shown under the QR, e.g. "Pay to UPI ID:
-    # store2home@okaxis" or "Zelle: Delivery Hub LLC".
     instructions = db.Column(db.Text, nullable=True)
+
+    # USA -> India shipments
+    qr_code_url_us_in = db.Column(db.String(500), nullable=True)
+    instructions_us_in = db.Column(db.Text, nullable=True)
+
+    # India -> USA shipments
+    qr_code_url_in_us = db.Column(db.String(500), nullable=True)
+    instructions_in_us = db.Column(db.Text, nullable=True)
 
     updated_at = db.Column(
         db.DateTime(timezone=True),
@@ -33,6 +37,10 @@ class PaymentSettings(db.Model):
         return {
             "qr_code_url": self.qr_code_url,
             "instructions": self.instructions,
+            "qr_code_url_us_in": self.qr_code_url_us_in,
+            "instructions_us_in": self.instructions_us_in,
+            "qr_code_url_in_us": self.qr_code_url_in_us,
+            "instructions_in_us": self.instructions_in_us,
             "updated_at": (
                 self.updated_at.isoformat() if self.updated_at else None
             ),

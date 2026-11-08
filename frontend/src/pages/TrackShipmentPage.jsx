@@ -3,6 +3,7 @@ import toast from "react-hot-toast";
 import { FiArrowRight, FiCheck, FiPackage, FiSearch, FiShield } from "react-icons/fi";
 import { submitTrackedPaymentProof, trackShipment } from "../api/shipments";
 import { getPaymentSettings } from "../api/settings";
+import { paymentForRoute } from "../utils/paymentRoute";
 import { formatMoney } from "../utils/money";
 import Reveal from "../components/Reveal";
 
@@ -32,8 +33,8 @@ function InvoiceSection({ shipment, onUpdated }) {
 
   useEffect(() => {
     if (!canPay) return;
-    getPaymentSettings().then((res) => setPayment(res.data)).catch(() => {});
-  }, [canPay]);
+    getPaymentSettings().then((res) => setPayment(paymentForRoute(res.data, shipment.route_direction))).catch(() => {});
+  }, [canPay, shipment.route_direction]);
 
   const send = async (event) => {
     event.preventDefault();

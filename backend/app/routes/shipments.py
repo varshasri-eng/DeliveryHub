@@ -885,6 +885,7 @@ def track_shipment(shipment_number):
             "created_at": shipment.created_at.isoformat() if shipment.created_at else None,
             "updated_at": shipment.updated_at.isoformat() if shipment.updated_at else None,
             "currency_code": shipment.currency_code or "USD",
+            "route_direction": shipment.route_direction,
             # The FedEx link is only shown to customers while the parcel is in transit.
             "tracking_number": shipment.tracking_number if shipment.status == "in_transit" else None,
             "tracking_url": fedex_tracking_url(shipment.tracking_number) if shipment.status == "in_transit" else None,

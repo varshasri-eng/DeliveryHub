@@ -5,6 +5,7 @@ import {
 } from "react-icons/fi";
 import { getMyShipments, submitPaymentProof } from "../../api/shipments";
 import { getPaymentSettings } from "../../api/settings";
+import { paymentForRoute } from "../../utils/paymentRoute";
 import { useBranding } from "../../context/BrandingContext";
 import { resolveMediaUrl } from "../../utils/media";
 import { formatMoney } from "../../utils/money";
@@ -292,7 +293,7 @@ function InvoiceModal({ shipment, paymentSettings, onClose, onPrint, onPaymentSu
           {invoice && (
             <PaymentSection
               invoice={invoice}
-              paymentSettings={paymentSettings}
+              paymentSettings={paymentForRoute(paymentSettings, shipment.route_direction)}
               total={total}
               currencyCode={shipment.currency_code}
               canSubmitPayment={canSubmitPayment}

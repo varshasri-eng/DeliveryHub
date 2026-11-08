@@ -1,22 +1,17 @@
 """
 Payment Settings Routes
 ------------------------
-GET    /api/payment-settings      - public: QR code + instructions for invoice payment
-PUT    /api/payment-settings      - admin only: update qr_code_url/instructions directly
-                                     (e.g. pointing at an externally-hosted image)
-POST   /api/payment-settings/qr   - admin only: upload/replace the QR image file
-DELETE /api/payment-settings/qr   - admin only: remove the current QR image
+GET    /api/payment-settings      - public: QR codes + instructions for invoice payment
+PUT    /api/payment-settings      - admin only: update instructions / qr_code_url directly
+POST   /api/payment-settings/qr   - admin only: upload/replace a QR image file
+DELETE /api/payment-settings/qr   - admin only: remove a QR image
 
-Registered ONCE at a single prefix, matching settings_bp's existing
-pattern (see app/__init__.py: settings_bp is also registered once at
-"/api/settings", with GET public and PUT admin-gated via the
-@admin_required decorator on the same path) — not two separate
-public/admin prefixes.
+Every write takes a `route` (US_TO_IN or IN_TO_US) so each direction has its own QR and
+instructions. Without `route`, the original shared (fallback) values are used.
 
-The uploaded QR always saves under a constant filename (qr_current.<ext>)
-so re-uploading replaces it in place rather than accumulating files —
-but the stored URL carries a `?v=<timestamp>` cache-buster so browsers
-don't keep showing a stale cached image after a replace.
+Each direction's QR is saved under a constant file name (qr_us_in.<ext>, qr_in_us.<ext>,
+qr_current.<ext> for the fallback) so re-uploading replaces it in place; the stored URL carries
+a `?v=<timestamp>` cache-buster so browsers don't show a stale image.
 """
 
 import os
@@ -32,6 +27,19 @@ payment_settings_bp = Blueprint("payment_settings", __name__)
 QR_UPLOAD_SUBDIR = os.path.join("static", "uploads", "payment_qr")
 QR_ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "webp"}
 QR_MAX_BYTES = 5 * 1024 * 1024  # 5 MB
+
+# route -> (qr column, instructions column, file stem)
+ROUTE_FIELDS = {
+    "US_TO_IN": ("qr_code_url_us_in", "instructions_us_in", "qr_us_in"),
+    "IN_TO_US": ("qr_code_url_in_us", "instructions_in_us", "qr_in_us"),
+    None: ("qr_code_url", "instructions", "qr_current"),
+}
+
+
+def _route_fields(route):
+    """Returns the column / file names for a route, or None when `route` is not valid."""
+    route = (route or None)
+    return ROUTE_FIELDS.get(route)
 
 
 def _get_payment_settings():
@@ -50,6 +58,17 @@ def _qr_upload_dir():
     return path
 
 
+def _remove_stale(stem):
+    upload_dir = _qr_upload_dir()
+    for stale_ext in QR_ALLOWED_EXTENSIONS:
+        stale_path = os.path.join(upload_dir, f"{stem}.{stale_ext}")
+        if os.path.exists(stale_path):
+            try:
+                os.remove(stale_path)
+            except OSError:
+                pass
+
+
 @payment_settings_bp.route("", methods=["GET"])
 def get_payment_settings():
     return jsonify(_get_payment_settings().to_dict()), 200
@@ -58,19 +77,18 @@ def get_payment_settings():
 @payment_settings_bp.route("", methods=["PUT"])
 @admin_required
 def update_payment_settings(customer):
-    """
-    Direct-set qr_code_url/instructions. Still useful for pointing at
-    an externally-hosted QR image (e.g. an imgur link) instead of
-    uploading a file — the upload endpoint below is the normal path
-    for "I have an image on my computer".
-    """
+    """Set instructions and / or qr_code_url (e.g. an externally hosted image) for a route."""
     data = request.get_json(silent=True) or {}
+    fields = _route_fields(data.get("route"))
+    if not fields:
+        return jsonify({"error": "route must be US_TO_IN or IN_TO_US."}), 400
+    qr_col, ins_col, _ = fields
     s = _get_payment_settings()
 
     if "qr_code_url" in data:
-        s.qr_code_url = (data["qr_code_url"] or "").strip() or None
+        setattr(s, qr_col, (data["qr_code_url"] or "").strip() or None)
     if "instructions" in data:
-        s.instructions = (data["instructions"] or "").strip() or None
+        setattr(s, ins_col, (data["instructions"] or "").strip() or None)
 
     db.session.commit()
     return jsonify({
@@ -82,11 +100,12 @@ def update_payment_settings(customer):
 @payment_settings_bp.route("/qr", methods=["POST"])
 @admin_required
 def upload_qr(customer):
-    """
-    Upload/replace the QR image. Always saves to the same filename
-    (qr_current.<ext>) — any previously-uploaded QR under a different
-    extension is removed first, so old files don't pile up.
-    """
+    """Upload / replace the QR image for a route (form field `qr`, plus `route`)."""
+    fields = _route_fields(request.form.get("route"))
+    if not fields:
+        return jsonify({"error": "route must be US_TO_IN or IN_TO_US."}), 400
+    qr_col, _, stem = fields
+
     file = request.files.get("qr")
     if not file or not file.filename:
         return jsonify({"error": "Please choose an image to upload."}), 400
@@ -96,9 +115,7 @@ def upload_qr(customer):
         if "." in file.filename else ""
     )
     if ext not in QR_ALLOWED_EXTENSIONS:
-        return jsonify({
-            "error": "QR image must be PNG, JPG, JPEG, or WEBP."
-        }), 400
+        return jsonify({"error": "QR image must be PNG, JPG, JPEG, or WEBP."}), 400
 
     file.seek(0, os.SEEK_END)
     size = file.tell()
@@ -106,51 +123,33 @@ def upload_qr(customer):
     if size > QR_MAX_BYTES:
         return jsonify({"error": "QR image must be under 5MB."}), 400
 
-    upload_dir = _qr_upload_dir()
+    # Remove any previous QR for this route under a different extension.
+    _remove_stale(stem)
 
-    # Remove any previous QR under a different extension so replacing
-    # a .png with a .jpg (etc.) doesn't leave the old file behind.
-    for stale_ext in QR_ALLOWED_EXTENSIONS:
-        stale_path = os.path.join(upload_dir, f"qr_current.{stale_ext}")
-        if os.path.exists(stale_path):
-            try:
-                os.remove(stale_path)
-            except OSError:
-                pass
-
-    filename = f"qr_current.{ext}"
-    file.save(os.path.join(upload_dir, filename))
+    filename = f"{stem}.{ext}"
+    file.save(os.path.join(_qr_upload_dir(), filename))
 
     s = _get_payment_settings()
     version = int(datetime.now(timezone.utc).timestamp())
-    s.qr_code_url = f"/static/uploads/payment_qr/{filename}?v={version}"
+    setattr(s, qr_col, f"/static/uploads/payment_qr/{filename}?v={version}")
     db.session.commit()
 
-    return jsonify({
-        "message": "QR code uploaded.",
-        "settings": s.to_dict(),
-    }), 200
+    return jsonify({"message": "QR code uploaded.", "settings": s.to_dict()}), 200
 
 
 @payment_settings_bp.route("/qr", methods=["DELETE"])
 @admin_required
 def delete_qr(customer):
-    """Remove the current QR entirely (falls back to 'not configured')."""
-    upload_dir = _qr_upload_dir()
+    """Remove the QR for a route (`?route=US_TO_IN` or `IN_TO_US`)."""
+    fields = _route_fields(request.args.get("route"))
+    if not fields:
+        return jsonify({"error": "route must be US_TO_IN or IN_TO_US."}), 400
+    qr_col, _, stem = fields
 
-    for stale_ext in QR_ALLOWED_EXTENSIONS:
-        stale_path = os.path.join(upload_dir, f"qr_current.{stale_ext}")
-        if os.path.exists(stale_path):
-            try:
-                os.remove(stale_path)
-            except OSError:
-                pass
+    _remove_stale(stem)
 
     s = _get_payment_settings()
-    s.qr_code_url = None
+    setattr(s, qr_col, None)
     db.session.commit()
 
-    return jsonify({
-        "message": "QR code removed.",
-        "settings": s.to_dict(),
-    }), 200
+    return jsonify({"message": "QR code removed.", "settings": s.to_dict()}), 200
