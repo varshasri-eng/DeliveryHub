@@ -274,7 +274,7 @@ function InvoiceModal({ shipment, paymentSettings, onClose, onPrint, onPaymentSu
             <p className="text-xs text-gray-400 mt-0.5">{invoice?.invoice_number}</p>
           </div>
           <div className="flex items-center gap-2">
-            <button onClick={() => downloadInvoice(shipment, settings.site_name)}
+            <button onClick={() => downloadInvoice(shipment, settings.site_name, settings.logo_url)}
               className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-gray-900 text-white text-sm font-semibold hover:bg-gray-700">
               <FiDownload size={14} /> Download
             </button>

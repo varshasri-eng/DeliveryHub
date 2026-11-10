@@ -7,7 +7,7 @@ function esc(value) {
 }
 
 // Downloads the invoice as a self-contained HTML file (open it and Print -> Save as PDF if a PDF is needed).
-export function downloadInvoice(shipment, siteName = "DeliveryHub") {
+export function downloadInvoice(shipment, siteName = "DeliveryHub", logoUrl = null) {
   const invoice = shipment.invoice;
   if (!invoice) return;
   const cur = shipment.currency_code || "USD";
@@ -16,6 +16,9 @@ export function downloadInvoice(shipment, siteName = "DeliveryHub") {
     <tr><td>${esc(item.description)}</td><td class="c">${esc(item.quantity)}</td>
     <td class="r">${esc(formatMoney(item.unit_price, cur))}</td>
     <td class="r"><strong>${esc(formatMoney(item.line_total, cur))}</strong></td></tr>`).join("");
+  // The file is opened from disk, so the logo needs a full address.
+  let logoSrc = "";
+  try { if (logoUrl) logoSrc = new URL(logoUrl, window.location.origin).href; } catch { /* no logo */ }
   const offer = Number(invoice.offer_discount_amount || 0);
   const manual = Number(invoice.manual_discount_amount || 0);
 
@@ -26,6 +29,7 @@ export function downloadInvoice(shipment, siteName = "DeliveryHub") {
   body{margin:0;padding:32px 16px;background:#f3f4f6;color:#111827;font:15px Arial,sans-serif}
   main{max-width:780px;margin:auto;padding:36px;background:#fff;border:1px solid #e5e7eb;border-radius:16px}
   .head{display:flex;justify-content:space-between;gap:20px;border-bottom:2px solid #e5e7eb;padding-bottom:22px;margin-bottom:22px}
+  .brand{display:flex;align-items:center;gap:12px} .brand img{width:48px;height:48px;object-fit:contain;border-radius:10px}
   h1{margin:0;font-size:25px} h2{margin:0;font-size:20px;text-align:right}
   .muted{color:#6b7280;margin:4px 0 0} .right{text-align:right}
   .parties{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
@@ -41,7 +45,7 @@ export function downloadInvoice(shipment, siteName = "DeliveryHub") {
   @media print{body{background:#fff;padding:0}main{border:0}}
 </style></head><body><main>
   <div class="head">
-    <div><h1>${esc(siteName)}</h1><p class="muted">Shipment Invoice</p></div>
+    <div class="brand">${logoSrc ? `<img src="${esc(logoSrc)}" alt="">` : ""}<div><h1>${esc(siteName)}</h1><p class="muted">Shipment Invoice</p></div></div>
     <div><h2>INVOICE</h2>
       <p class="muted right">Invoice #: <strong>${esc(invoice.invoice_number)}</strong><br>
       Date: <strong>${esc(date)}</strong><br>Shipment #: <strong>${esc(shipment.shipment_number)}</strong></p></div>

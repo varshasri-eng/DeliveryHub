@@ -142,14 +142,15 @@ export function BrandingProvider({ children }) {
     // index.css's pastel green defaults on first load.
   }, [settings.primary_color, settings.secondary_color, settings.accent_color]);
 
-  // update favicon
+  // update favicon (uses the logo when no separate favicon is set)
   useEffect(() => {
-    if (settings.favicon_url) {
-      let link = document.querySelector("link[rel='icon']");
-      if (!link) { link = document.createElement("link"); link.rel = "icon"; document.head.appendChild(link); }
-      link.href = settings.favicon_url;
-    }
-  }, [settings.favicon_url]);
+    const href = settings.favicon_url || settings.logo_url;
+    if (!href) return;
+    let link = document.querySelector("link[rel='icon']");
+    if (!link) { link = document.createElement("link"); link.rel = "icon"; document.head.appendChild(link); }
+    link.removeAttribute("type");
+    link.href = href;
+  }, [settings.favicon_url, settings.logo_url]);
 
   return (
     <BrandingContext.Provider value={{ settings, loaded, setSettings }}>

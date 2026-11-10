@@ -1,5 +1,6 @@
 import { formatMoney } from "../utils/money";
 import { useBranding } from "../context/BrandingContext";
+import BrandLogo from "./BrandLogo";
 
 /**
  * The invoice paper, shared by the customer's "My Shipments" page and the admin screen.
@@ -23,9 +24,12 @@ export default function InvoiceDocument({ shipment, children }) {
   return (
     <div id="shipment-invoice" className="bg-white p-8 text-gray-900">
       <div className="mb-6 flex items-start justify-between border-b-2 border-gray-200 pb-6">
-        <div>
-          <h1 className="text-2xl font-extrabold">{settings.site_name}</h1>
-          <p className="mt-1 text-sm text-gray-500">Shipment Invoice</p>
+        <div className="flex items-center gap-3">
+          <BrandLogo size="lg" />
+          <div>
+            <h1 className="text-2xl font-extrabold">{settings.site_name}</h1>
+            <p className="mt-1 text-sm text-gray-500">Shipment Invoice</p>
+          </div>
         </div>
         <div className="text-right">
           <h2 className="text-xl font-extrabold">INVOICE</h2>
