@@ -62,6 +62,9 @@ class Shipment(db.Model):
     tracking_number = db.Column(db.String(20))
     label_path = db.Column(db.String(500))
 
+    # When the shipment entered "In Transit" (drives the 3-day delivery check in admin)
+    in_transit_at = db.Column(db.DateTime(timezone=True))
+
     created_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = db.Column(db.DateTime(timezone=True), default=lambda: datetime.now(timezone.utc),
                            onupdate=lambda: datetime.now(timezone.utc))
@@ -108,6 +111,7 @@ class Shipment(db.Model):
             "tracking_number": self.tracking_number,
             "tracking_url": fedex_tracking_url(self.tracking_number),
             "label_path": self.label_path,
+            "in_transit_at": self.in_transit_at.isoformat() if self.in_transit_at else None,
             "created_at": self.created_at.isoformat() if self.created_at else None,
         }
         if include_invoice and self.invoice:

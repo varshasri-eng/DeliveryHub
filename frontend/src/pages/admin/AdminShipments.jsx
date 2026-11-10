@@ -5,7 +5,7 @@ import { resolveMediaUrl } from "../../utils/media";
 import { downloadInvoice } from "../../utils/invoiceDownload";
 import { useBranding } from "../../context/BrandingContext";
 import InvoiceDocument from "../../components/InvoiceDocument";
-import { FiDownload, FiExternalLink, FiPackage, FiPaperclip, FiX } from "react-icons/fi";
+import { FiCheckCircle, FiDownload, FiExternalLink, FiPackage, FiPaperclip, FiX } from "react-icons/fi";
 import {
   getAdminShipments, updateShipmentStatus,
   raiseShipmentInvoice, updateShipmentInvoice, verifyShipmentPayment, rejectShipmentPayment,
@@ -28,6 +28,63 @@ const INVOICE_CHIP = {
   payment_rejected:  { label: "Payment rejected",        cls: "bg-red-50 text-red-700" },
   payment_verified:  { label: "Paid & verified",         cls: "bg-green-50 text-green-700" },
 };
+
+// ── Status moves ────────────────────────────────────────────
+// A shipment can go one step back or forward, and can be cancelled from any step.
+// Moving forward needs the previous step finished (invoice raised / payment verified).
+const FLOW = ["requested", "picked_up", "in_transit", "delivered"];
+const TRANSIT_DAYS = 3;
+
+function statusChoices(s) {
+  const cur = s.status || "requested";
+  const choices = [{ value: cur, label: STATUS_LABELS[cur] }];
+  if (cur === "cancelled") {
+    choices.push({ value: "requested", label: "Reopen as Requested" });
+    return choices;
+  }
+  const i = FLOW.indexOf(cur);
+  if (i > 0) choices.push({ value: FLOW[i - 1], label: STATUS_LABELS[FLOW[i - 1]] });
+  if (i < FLOW.length - 1) {
+    const next = FLOW[i + 1];
+    let blocked = "";
+    if (next === "picked_up" && !s.invoice) blocked = "raise the invoice first";
+    if (next === "in_transit" && s.invoice?.status !== "payment_verified") blocked = "verify the payment first";
+    choices.push({ value: next, label: blocked ? `${STATUS_LABELS[next]} (${blocked})` : STATUS_LABELS[next], disabled: !!blocked });
+  }
+  choices.push({ value: "cancelled", label: "Cancel shipment" });
+  return choices;
+}
+
+// Whole calendar days since the shipment went In Transit (10th -> 13th = 3)
+function daysInTransit(s) {
+  if (!s.in_transit_at) return null;
+  const start = new Date(s.in_transit_at);
+  const a = new Date(start.getFullYear(), start.getMonth(), start.getDate());
+  const now = new Date();
+  const b = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  return Math.round((b - a) / 86400000);
+}
+const transitReady = (s) => (daysInTransit(s) ?? 0) >= TRANSIT_DAYS;
+
+// Picked Up: verified first, then waiting for verification, then not paid yet.
+// In Transit: the ones past 3 days (green tick) first.
+function sortForTab(list, tab) {
+  const byAge = (a, b) => new Date(a.created_at) - new Date(b.created_at);
+  const copy = [...list];
+  if (tab === "picked_up") {
+    const rank = (s) => {
+      const st = s.invoice?.status;
+      return st === "payment_verified" ? 0 : st === "payment_submitted" ? 1 : 2;
+    };
+    return copy.sort((a, b) => rank(a) - rank(b) || byAge(a, b));
+  }
+  if (tab === "in_transit") {
+    return copy.sort((a, b) =>
+      Number(transitReady(b)) - Number(transitReady(a)) ||
+      new Date(a.in_transit_at || a.created_at) - new Date(b.in_transit_at || b.created_at));
+  }
+  return copy.sort((a, b) => byAge(b, a)); // other tabs: newest first
+}
 
 function nextStep(s) {
   const inv = s.invoice?.status;
@@ -66,7 +123,7 @@ export default function AdminShipments() {
     return acc;
   }, {});
 
-  const filtered = shipments.filter((s) => (s.status || "requested") === tab);
+  const filtered = sortForTab(shipments.filter((s) => (s.status || "requested") === tab), tab);
 
   const refreshOne = (updated) => {
     setShipments((prev) => prev.map((s) => (s.id === updated.id ? updated : s)));
@@ -77,6 +134,7 @@ export default function AdminShipments() {
 
   const handleStatusChange = async (shipment, status) => {
     if (status === shipment.status) return;
+    if (status === "cancelled" && !window.confirm(`Cancel ${shipment.shipment_number}?`)) return;
     if (status === "in_transit" && !shipment.tracking_number &&
         !window.confirm("No FedEx tracking number has been added yet, so the customer will not see a tracking link. Continue anyway?")) {
       return;
@@ -188,8 +246,8 @@ export default function AdminShipments() {
                     aria-label="Shipment status"
                     className="mt-1.5 text-xs font-semibold border border-gray-200 rounded-full px-2 py-1 capitalize"
                   >
-                    {STATUS_OPTIONS.map((st) => (
-                      <option key={st} value={st}>{STATUS_LABELS[st]}</option>
+                    {statusChoices(s).map((c) => (
+                      <option key={c.value} value={c.value} disabled={c.disabled}>{c.label}</option>
                     ))}
                   </select>
                 </div>
@@ -201,6 +259,17 @@ export default function AdminShipments() {
                   {s.tracking_number ? `FedEx ${s.tracking_number}` : "FedEx label: not added"}
                 </span>
               </div>
+              {s.status === "in_transit" && s.in_transit_at && (
+                transitReady(s) ? (
+                  <p className="mt-2 inline-flex items-center gap-1.5 rounded-full bg-green-50 px-2.5 py-1 text-xs font-semibold text-green-700">
+                    <FiCheckCircle size={13} /> {daysInTransit(s)} days in transit - check delivery and mark Delivered
+                  </p>
+                ) : (
+                  <p className="mt-2 text-xs font-semibold text-amber-700">
+                    In transit since {new Date(s.in_transit_at).toLocaleDateString()} - day {Math.max(daysInTransit(s), 0)} of {TRANSIT_DAYS}
+                  </p>
+                )
+              )}
               {hint && <p className="mt-2 text-xs text-gray-500">{hint}</p>}
 
               <div className="border-t border-gray-50 mt-3 pt-3 flex flex-wrap items-center justify-between gap-2">

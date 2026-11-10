@@ -29,6 +29,9 @@ from app.models.shipment import Shipment, VALID_SHIPMENT_STATUSES
 from app.models.invoice import Invoice, InvoiceItem
 from app.utils.auth import permission_required
 
+# The order of a shipment's journey (Cancelled can be set from any step)
+STATUS_FLOW = ["requested", "picked_up", "in_transit", "delivered"]
+
 admin_shipments_bp = Blueprint("admin_shipments", __name__)
 
 
@@ -197,7 +200,36 @@ def update_status(customer, shipment_id):
     if new_status not in VALID_SHIPMENT_STATUSES:
         return jsonify({"error": f"status must be one of: {sorted(VALID_SHIPMENT_STATUSES)}"}), 400
 
+    current = shipment.status or "requested"
+    if new_status == current:
+        return jsonify({"message": "Status unchanged.", "shipment": shipment.to_dict()}), 200
+
+    # Moves allowed: one step forward or back along the journey, Cancel from anywhere,
+    # and Requested again from Cancelled.
+    if current == "cancelled":
+        allowed = {"requested"}
+    else:
+        i = STATUS_FLOW.index(current)
+        allowed = {"cancelled"}
+        if i > 0:
+            allowed.add(STATUS_FLOW[i - 1])
+        if i < len(STATUS_FLOW) - 1:
+            allowed.add(STATUS_FLOW[i + 1])
+    if new_status not in allowed:
+        return jsonify({"error": f"A shipment can't move from {current} to {new_status} directly."}), 409
+
+    # Forward moves need the previous step to be finished
+    invoice = shipment.invoice
+    if new_status == "picked_up" and current == "requested" and not invoice:
+        return jsonify({"error": "Raise the invoice before moving this shipment to Picked Up."}), 409
+    if new_status == "in_transit" and current == "picked_up" and (not invoice or invoice.status != "payment_verified"):
+        return jsonify({"error": "The invoice payment must be verified before this shipment can go In Transit."}), 409
+
     shipment.status = new_status
+    if new_status == "in_transit":
+        shipment.in_transit_at = datetime.now(timezone.utc)
+    elif new_status in ("requested", "picked_up"):
+        shipment.in_transit_at = None
     db.session.commit()
     return jsonify({"message": "Status updated.", "shipment": shipment.to_dict()}), 200
 
@@ -309,6 +341,9 @@ def raise_invoice(customer, shipment_id):
     db.session.add(invoice)
     db.session.flush()
     _replace_invoice_items(invoice, values["items"])
+    # Raising the invoice moves a new order on to Picked Up
+    if (shipment.status or "requested") == "requested":
+        shipment.status = "picked_up"
     db.session.commit()
 
     return jsonify({"message": "Invoice raised.", "invoice": invoice.to_dict()}), 201
