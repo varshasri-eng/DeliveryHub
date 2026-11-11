@@ -27,6 +27,7 @@ from werkzeug.utils import secure_filename
 from app import db
 from app.models.shipment import Shipment, VALID_SHIPMENT_STATUSES
 from app.models.invoice import Invoice, InvoiceItem
+from app.models.payment_record import PaymentRecord
 from app.utils.auth import permission_required
 
 # The order of a shipment's journey (Cancelled can be set from any step)
@@ -376,6 +377,31 @@ def update_invoice(customer, invoice_id):
     return jsonify({"message": "Invoice updated.", "invoice": invoice.to_dict()}), 200
 
 
+def _record_payment(invoice):
+    """Add (or refresh) this shipment's row in the revenue list when its payment is verified."""
+    shipment = invoice.shipment
+    if not shipment:
+        return
+    service_name = " — ".join(filter(None, [
+        shipment.service_type.name if shipment.service_type else None,
+        shipment.pricing_tier.tier_name if shipment.pricing_tier else None,
+        shipment.sub_service_name,
+    ]))
+    record = PaymentRecord.query.filter_by(shipment_id=shipment.id).first()
+    if record is None:
+        record = PaymentRecord(shipment_id=shipment.id)
+        db.session.add(record)
+    record.invoice_id = invoice.id
+    record.shipment_number = shipment.shipment_number
+    record.route_direction = shipment.route_direction
+    record.service_name = service_name[:500]
+    record.sender_name = shipment.sender_name
+    record.receiver_name = shipment.receiver_name
+    record.currency_code = shipment.currency_code or "USD"
+    record.amount_paid = invoice.total_amount
+    record.paid_at = invoice.paid_at
+
+
 @admin_shipments_bp.route("/invoices/<int:invoice_id>/verify", methods=["PUT"])
 @permission_required("write")
 def verify_payment(customer, invoice_id):
@@ -388,6 +414,7 @@ def verify_payment(customer, invoice_id):
     invoice.status = "payment_verified"
     invoice.paid_at = datetime.now(timezone.utc)
     invoice.payment_verified_by = customer.id
+    _record_payment(invoice)
     db.session.commit()
 
     return jsonify({"message": "Payment verified.", "invoice": invoice.to_dict()}), 200

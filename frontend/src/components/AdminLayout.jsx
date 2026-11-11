@@ -6,6 +6,7 @@ import toast from "react-hot-toast";
 import {
   FiUsers,
   FiUserPlus,
+  FiTrendingUp,
   FiLogOut,
   FiHome,
   FiShield,
@@ -72,6 +73,9 @@ export default function AdminLayout() {
           </NavLink>
           <NavLink to="/admin/shipments" className={navClass}>
             <FiPackage /> Shipments
+          </NavLink>
+          <NavLink to="/admin/revenue" className={navClass}>
+            <FiTrendingUp /> Revenue
           </NavLink>
           <NavLink to="/admin/services" className={navClass}>
             <FiTruck /> Services

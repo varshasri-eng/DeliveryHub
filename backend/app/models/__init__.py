@@ -20,3 +20,4 @@ from app.models.service_type import (
 from app.models.lead import Lead
 from app.models.shipment import Shipment
 from app.models.invoice import Invoice, InvoiceItem
+from app.models.payment_record import PaymentRecord

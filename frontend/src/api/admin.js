@@ -153,3 +153,6 @@ export const deletePaymentQr = (route) =>
 // ── Leads (every unique sender / receiver) ─────────────────────
 export const getAdminLeads = (params = {}) => api.get("/admin/leads", { params });
 export const getAdminLead = (id) => api.get(`/admin/leads/${id}`);
+
+// ── Revenue (verified payments, by month) ──────────────────────
+export const getRevenue = (month) => api.get("/admin/revenue", { params: month ? { month } : {} });
