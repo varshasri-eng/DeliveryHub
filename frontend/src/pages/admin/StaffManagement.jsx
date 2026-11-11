@@ -4,10 +4,11 @@ import {
   approveStaff, rejectStaff,
   changePermission, revokeStaff,
 } from "../../api/staff";
+import { createStaff, updateStaff } from "../../api/admin";
 import toast from "react-hot-toast";
 import {
   FiUsers, FiShield, FiCheckCircle, FiXCircle,
-  FiRefreshCw, FiLock, FiUnlock,
+  FiRefreshCw, FiLock, FiUnlock, FiUserPlus, FiEdit2,
 } from "react-icons/fi";
 
 const PERMISSIONS = ["read", "write", "full"];
@@ -57,6 +58,48 @@ export default function StaffManagement() {
   const [permTarget, setPermTarget] = useState(null);
   const [newPerm, setNewPerm]       = useState("read");
   const [changingPerm, setChangingPerm] = useState(false);
+
+  // Add / edit staff modal: { mode: "add" } or { mode: "edit", member }
+  const [form, setForm]     = useState(null);
+  const [values, setValues] = useState({ name: "", email: "", phone: "", password: "", permission: "read" });
+  const [saving, setSaving] = useState(false);
+
+  const openAdd = () => {
+    setValues({ name: "", email: "", phone: "", password: "", permission: "read" });
+    setForm({ mode: "add" });
+  };
+  const openEdit = (member) => {
+    setValues({ name: member.name || "", email: member.email || "", phone: member.phone || "", password: "", permission: member.admin_role });
+    setForm({ mode: "edit", member });
+  };
+  const setField = (key) => (e) => setValues((v) => ({ ...v, [key]: e.target.value }));
+
+  const handleSaveStaff = async (e) => {
+    e.preventDefault();
+    if (!values.name.trim()) return toast.error("Enter a name.");
+    if (!values.email.trim()) return toast.error("Enter an email.");
+    if (!values.phone.trim()) return toast.error("Enter a phone number.");
+    if (form.mode === "add" && values.password.length < 8) return toast.error("Password must be at least 8 characters.");
+    if (form.mode === "edit" && values.password && values.password.length < 8) return toast.error("New password must be at least 8 characters.");
+    setSaving(true);
+    try {
+      if (form.mode === "add") {
+        await createStaff(values);
+        toast.success(`${values.name.trim()} added.`);
+        setTab("active");
+      } else {
+        const { permission, ...details } = values;   // access level is changed with "Edit Access"
+        await updateStaff(form.member.id, details);
+        toast.success("Details updated.");
+      }
+      setForm(null);
+      load();
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Could not save.");
+    } finally {
+      setSaving(false);
+    }
+  };
 
   const load = () => {
     setLoading(true);
@@ -136,10 +179,16 @@ export default function StaffManagement() {
             Review requests and manage team permissions
           </p>
         </div>
-        <button onClick={load}
-          className="btn-secondary flex items-center gap-2 text-sm">
-          <FiRefreshCw size={13} /> Refresh
-        </button>
+        <div className="flex items-center gap-2">
+          <button onClick={openAdd}
+            className="btn-primary flex items-center gap-2 text-sm">
+            <FiUserPlus size={13} /> Add staff
+          </button>
+          <button onClick={load}
+            className="btn-secondary flex items-center gap-2 text-sm">
+            <FiRefreshCw size={13} /> Refresh
+          </button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -277,6 +326,13 @@ export default function StaffManagement() {
                       <FiShield size={10} /> {s.admin_role} access
                     </span>
                     <button
+                      onClick={() => openEdit(s)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold
+                                 bg-gray-50 text-gray-700 hover:bg-gray-100
+                                 rounded-lg transition-colors border border-gray-200">
+                      <FiEdit2 size={11} /> Edit Details
+                    </button>
+                    <button
                       onClick={() => { setPermTarget(s); setNewPerm(s.admin_role); }}
                       className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold
                                  bg-purple-50 text-purple-700 hover:bg-purple-100
@@ -326,6 +382,59 @@ export default function StaffManagement() {
             ))}
           </div>
         )
+      )}
+
+      {/* ── Add / edit staff modal ─────────────────────── */}
+      {form && (
+        <Modal onClose={() => setForm(null)}>
+          <form onSubmit={handleSaveStaff}>
+            <h3 className="text-lg font-semibold text-gray-900 mb-1">
+              {form.mode === "add" ? "Add Staff Member" : `Edit ${form.member.name}`}
+            </h3>
+            <p className="text-gray-500 text-sm mb-4">
+              {form.mode === "add"
+                ? "They can sign in at /admin/login straight away with the password you set."
+                : "Leave the password empty to keep the current one."}
+            </p>
+            <div className="space-y-3 mb-5">
+              <div><label className="label">Name</label>
+                <input className="input" value={values.name} onChange={setField("name")} /></div>
+              <div><label className="label">Email</label>
+                <input type="email" className="input" value={values.email} onChange={setField("email")} /></div>
+              <div><label className="label">Phone</label>
+                <input className="input" value={values.phone} onChange={setField("phone")} /></div>
+              <div><label className="label">{form.mode === "add" ? "Password (min 8 characters)" : "New password (optional)"}</label>
+                <input type="password" autoComplete="new-password" className="input"
+                  value={values.password} onChange={setField("password")} /></div>
+              {form.mode === "add" && (
+                <div>
+                  <label className="label">Access level</label>
+                  <div className="space-y-2">
+                    {PERMISSIONS.map((p) => (
+                      <label key={p}
+                        className={`flex items-start gap-3 p-2.5 rounded-xl border cursor-pointer transition-colors
+                          ${values.permission === p ? "border-brand-400 bg-brand-50" : "border-gray-200 hover:border-gray-300"}`}>
+                        <input type="radio" name="add-perm" value={p} checked={values.permission === p}
+                          onChange={() => setValues((v) => ({ ...v, permission: p }))}
+                          className="mt-0.5 accent-brand-500" />
+                        <div>
+                          <p className="text-sm font-semibold text-gray-800 capitalize">{p}</p>
+                          <p className="text-xs text-gray-500">{PERMISSION_DESC[p]}</p>
+                        </div>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <div className="flex gap-3">
+              <button type="button" className="btn-secondary flex-1" onClick={() => setForm(null)}>Cancel</button>
+              <button type="submit" className="btn-primary flex-1" disabled={saving}>
+                {saving ? "Saving…" : form.mode === "add" ? "Add staff" : "Save changes"}
+              </button>
+            </div>
+          </form>
+        </Modal>
       )}
 
       {/* ── Approve modal ──────────────────────────────── */}

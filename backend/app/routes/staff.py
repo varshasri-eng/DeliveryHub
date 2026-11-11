@@ -3,6 +3,8 @@ Staff Routes — Admin RBAC
 --------------------------
 POST /api/staff/register              - staff self-registration (creates pending account)
 
+POST /api/staff                       - admin adds a staff member directly (active at once)   [full only]
+PUT  /api/staff/<id>                  - edit a staff member's name, email, phone, password    [full only]
 GET  /api/staff/pending               - list pending staff requests       [full only]
 GET  /api/staff/all                   - list all staff members             [full only]
 PUT  /api/staff/<id>/approve          - approve + assign permission        [full only]
@@ -78,6 +80,99 @@ def staff_register():
         "message": "Staff request submitted. You will be notified once approved.",
         "staff_id": staff.id,
     }), 201
+
+
+# ── ADD STAFF DIRECTLY ───────────────────────────────────────
+@staff_bp.route("", methods=["POST"])
+@permission_required("full")
+def add_staff(customer):
+    """An admin creates a staff account that is active straight away (no approval step)."""
+    data = request.get_json(silent=True) or {}
+
+    name  = (data.get("name") or "").strip()
+    phone = (data.get("phone") or "").strip()
+    email = (data.get("email") or "").strip().lower()
+    password = data.get("password") or ""
+    permission = (data.get("permission") or "").strip()
+
+    if not name:  return jsonify({"error": "Name is required."}), 400
+    if not phone: return jsonify({"error": "Phone is required."}), 400
+    if len(phone) > 20: return jsonify({"error": "Phone must be 20 characters or fewer."}), 400
+    if not email: return jsonify({"error": "Email is required."}), 400
+    if len(password) < MIN_PASSWORD_LENGTH:
+        return jsonify({"error": f"Password must be at least {MIN_PASSWORD_LENGTH} characters."}), 400
+    if permission not in VALID_PERMISSIONS:
+        return jsonify({"error": f"Permission must be one of: {sorted(VALID_PERMISSIONS)}"}), 400
+
+    if Customer.query.filter_by(phone=phone).first():
+        return jsonify({"error": "Phone already registered."}), 409
+    if Customer.query.filter_by(email=email).first():
+        return jsonify({"error": "Email already registered."}), 409
+
+    staff = Customer(
+        name=name,
+        phone=phone,
+        email=email,
+        whatsapp_number=(data.get("whatsapp_number") or phone).strip(),
+        role="admin",
+        admin_role=permission,
+        is_active=True,
+        is_verified=True,
+    )
+    staff.set_password(password)
+    db.session.add(staff)
+    db.session.commit()
+
+    return jsonify({
+        "message": f"{staff.name} added with '{permission}' access. They can sign in at /admin/login.",
+        "staff": staff.to_dict(),
+    }), 201
+
+
+# ── EDIT STAFF DETAILS ───────────────────────────────────────
+@staff_bp.route("/<int:staff_id>", methods=["PUT"])
+@permission_required("full")
+def update_staff(customer, staff_id):
+    target = Customer.query.get(staff_id)
+    if not target or target.role != "admin" or target.admin_role not in VALID_PERMISSIONS:
+        return jsonify({"error": "Staff member not found."}), 404
+
+    data = request.get_json(silent=True) or {}
+
+    if "name" in data:
+        name = (data.get("name") or "").strip()
+        if not name:
+            return jsonify({"error": "Name is required."}), 400
+        target.name = name
+    if "phone" in data:
+        phone = (data.get("phone") or "").strip()
+        if not phone:
+            return jsonify({"error": "Phone is required."}), 400
+        if len(phone) > 20:
+            return jsonify({"error": "Phone must be 20 characters or fewer."}), 400
+        clash = Customer.query.filter(Customer.phone == phone, Customer.id != target.id).first()
+        if clash:
+            return jsonify({"error": "Phone already registered."}), 409
+        target.phone = phone
+    if "email" in data:
+        email = (data.get("email") or "").strip().lower()
+        if not email:
+            return jsonify({"error": "Email is required."}), 400
+        clash = Customer.query.filter(Customer.email == email, Customer.id != target.id).first()
+        if clash:
+            return jsonify({"error": "Email already registered."}), 409
+        target.email = email
+    password = data.get("password") or ""
+    if password:
+        if len(password) < MIN_PASSWORD_LENGTH:
+            return jsonify({"error": f"Password must be at least {MIN_PASSWORD_LENGTH} characters."}), 400
+        target.set_password(password)
+        # a new password signs them out everywhere
+        from app.models.session import Session
+        Session.query.filter_by(customer_id=target.id, is_active=True).update({"is_active": False})
+
+    db.session.commit()
+    return jsonify({"message": f"{target.name}'s details updated.", "staff": target.to_dict()}), 200
 
 
 # ── LIST PENDING REQUESTS ────────────────────────────────────

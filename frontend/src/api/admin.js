@@ -153,6 +153,10 @@ export const deletePaymentQr = (route) =>
 // ── Leads (every unique sender / receiver) ─────────────────────
 export const getAdminLeads = (params = {}) => api.get("/admin/leads", { params });
 export const getAdminLead = (id) => api.get(`/admin/leads/${id}`);
+// ── Staff (add / edit details) ─────────────────────────────────
+export const createStaff = (data) => api.post("/staff", data);
+export const updateStaff = (id, data) => api.put(`/staff/${id}`, data);
+
 export const createAdminLead = (data) => api.post("/admin/leads", data);
 export const updateAdminLead = (id, data) => api.put(`/admin/leads/${id}`, data);
 
