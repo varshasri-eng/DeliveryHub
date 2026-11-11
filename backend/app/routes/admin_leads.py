@@ -4,6 +4,8 @@ Admin Leads Routes
 GET /api/admin/leads            - list leads (?search=&role=sender|receiver|both&page=&per_page=)   [read]
 GET /api/admin/leads/<id>       - one lead: details, who they send to, who they receive from,
                                   and every shipment they are part of                                [read]
+POST /api/admin/leads           - add a lead by hand                                                 [write]
+PUT  /api/admin/leads/<id>      - edit a lead's name, phone, country, city, state, postal code, address [write]
 """
 from flask import Blueprint, jsonify, request
 from sqlalchemy import distinct, func, or_
@@ -11,6 +13,7 @@ from sqlalchemy import distinct, func, or_
 from app import db
 from app.models.lead import Lead
 from app.models.shipment import Shipment
+from app.utils.leads import phone_key
 from app.utils.auth import permission_required
 
 admin_leads_bp = Blueprint("admin_leads", __name__)
@@ -152,3 +155,83 @@ def get_lead(customer, lead_id):
         "receives_from": connections(Shipment.receiver_lead_id, Shipment.sender_lead_id),
         "shipments": history,
     }), 200
+
+
+# ── Add / edit ───────────────────────────────────────────────
+_TEXT_LIMITS = {"name": 255, "phone": 30, "country": 60, "city": 120, "province": 120, "postal_code": 20}
+
+
+def _clean_lead_fields(data, require_all):
+    """Returns (values, error). With require_all=False only the fields that were sent are returned."""
+    values = {}
+    for field, limit in _TEXT_LIMITS.items():
+        if field in data or require_all:
+            value = (data.get(field) or "").strip()
+            if len(value) > limit:
+                return None, f"{field.replace('_', ' ').capitalize()} is too long (max {limit} characters)."
+            values[field] = value or None
+    if "address" in data or require_all:
+        values["address"] = (data.get("address") or "").strip() or None
+    return values, None
+
+
+def _phone_taken(key, except_id=None):
+    query = Lead.query.filter_by(phone_key=key)
+    if except_id:
+        query = query.filter(Lead.id != except_id)
+    return query.first()
+
+
+@admin_leads_bp.route("", methods=["POST"])
+@permission_required("write")
+def create_lead(customer):
+    data = request.get_json(silent=True) or {}
+    values, error = _clean_lead_fields(data, require_all=True)
+    if error:
+        return jsonify({"error": error}), 400
+    if not values["name"]:
+        return jsonify({"error": "Name is required."}), 400
+    key = phone_key(values["phone"], values["country"])
+    if not values["phone"] or not key:
+        return jsonify({"error": "Enter a valid phone number."}), 400
+    other = _phone_taken(key)
+    if other:
+        return jsonify({"error": f"This phone number already belongs to {other.name}.", "existing_id": other.id}), 409
+
+    lead = Lead(phone_key=key, **values)
+    db.session.add(lead)
+    db.session.commit()
+    return jsonify({"message": "Lead added.", "lead": lead.to_dict()}), 201
+
+
+@admin_leads_bp.route("/<int:lead_id>", methods=["PUT"])
+@permission_required("write")
+def update_lead(customer, lead_id):
+    lead = Lead.query.get(lead_id)
+    if not lead:
+        return jsonify({"error": "Lead not found."}), 404
+
+    data = request.get_json(silent=True) or {}
+    values, error = _clean_lead_fields(data, require_all=False)
+    if error:
+        return jsonify({"error": error}), 400
+    if "name" in values and not values["name"]:
+        return jsonify({"error": "Name is required."}), 400
+    if "phone" in values and not values["phone"]:
+        return jsonify({"error": "Phone number is required."}), 400
+
+    phone = values.get("phone", lead.phone)
+    country = values.get("country", lead.country)
+    key = phone_key(phone, country)
+    if not key:
+        return jsonify({"error": "Enter a valid phone number."}), 400
+    if key != lead.phone_key:
+        other = _phone_taken(key, except_id=lead.id)
+        if other:
+            return jsonify({"error": f"This phone number already belongs to {other.name}.", "existing_id": other.id}), 409
+        lead.phone_key = key
+
+    for field, value in values.items():
+        setattr(lead, field, value)
+    db.session.commit()
+    return jsonify({"message": "Lead updated.", "lead": lead.to_dict()}), 200

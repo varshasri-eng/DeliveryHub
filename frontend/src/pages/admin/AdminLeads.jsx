@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { FiArrowLeft, FiArrowRight, FiMapPin, FiPhone, FiSearch, FiUsers, FiX } from "react-icons/fi";
-import { getAdminLead, getAdminLeads } from "../../api/admin";
+import { FiArrowLeft, FiArrowRight, FiEdit2, FiMapPin, FiPhone, FiPlus, FiSearch, FiUsers, FiX } from "react-icons/fi";
+import { createAdminLead, getAdminLead, getAdminLeads, updateAdminLead } from "../../api/admin";
 import { formatMoney } from "../../utils/money";
 
 const FILTERS = [
@@ -15,6 +15,59 @@ const STATUS_LABEL = {
   delivered: "Delivered", cancelled: "Cancelled",
 };
 const PER_PAGE = 25;
+const EMPTY_FORM = { name: "", phone: "", country: "", city: "", province: "", postal_code: "", address: "" };
+
+// Add / edit form (used in a modal for new leads and inline inside a lead's details)
+function LeadForm({ initial, submitLabel, onSubmit, onCancel }) {
+  const [form, setForm] = useState({ ...EMPTY_FORM, ...Object.fromEntries(Object.entries(initial || {}).filter(([k]) => k in EMPTY_FORM).map(([k, v]) => [k, v ?? ""])) });
+  const [saving, setSaving] = useState(false);
+  const set = (key) => (e) => setForm((f) => ({ ...f, [key]: e.target.value }));
+
+  const submit = async (e) => {
+    e.preventDefault();
+    if (!form.name.trim()) return toast.error("Enter a name.");
+    if (!form.phone.trim()) return toast.error("Enter a phone number.");
+    setSaving(true);
+    try {
+      await onSubmit(form);
+    } catch (err) {
+      toast.error(err.response?.data?.error || "Could not save this lead.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const field = (key, label, extra = {}) => (
+    <label className="block">
+      <span className="mb-1 block text-xs font-semibold text-gray-500">{label}</span>
+      <input value={form[key]} onChange={set(key)} className="input w-full" {...extra} />
+    </label>
+  );
+
+  return (
+    <form onSubmit={submit} className="space-y-3">
+      <div className="grid gap-3 sm:grid-cols-2">
+        {field("name", "Name *")}
+        {field("phone", "Phone * (with country code, e.g. +91 98765 43210)")}
+        {field("country", "Country", { list: "lead-countries", placeholder: "United States or India" })}
+        {field("city", "City")}
+        {field("province", "State / province")}
+        {field("postal_code", "Postal code")}
+      </div>
+      <datalist id="lead-countries"><option value="United States" /><option value="India" /></datalist>
+      <label className="block">
+        <span className="mb-1 block text-xs font-semibold text-gray-500">Address</span>
+        <textarea value={form.address} onChange={set("address")} rows={2} className="input w-full" />
+      </label>
+      <div className="flex justify-end gap-2">
+        <button type="button" onClick={onCancel} className="btn-secondary">Cancel</button>
+        <button type="submit" disabled={saving} className="rounded-xl bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-700 disabled:opacity-50">
+          {saving ? "Saving…" : submitLabel}
+        </button>
+      </div>
+    </form>
+  );
+}
 
 const place = (lead) =>
   [lead.city, lead.province, lead.country].filter(Boolean).join(", ") || lead.address || "No location";
@@ -30,6 +83,8 @@ export default function AdminLeads() {
   const [role, setRole] = useState("");
   const [page, setPage] = useState(1);
   const [openId, setOpenId] = useState(null);
+  const [adding, setAdding] = useState(false);
+  const [reload, setReload] = useState(0);
 
   // wait for a pause in typing before searching
   useEffect(() => {
@@ -50,13 +105,19 @@ export default function AdminLeads() {
       .catch(() => active && toast.error("Could not load leads."))
       .finally(() => active && setLoading(false));
     return () => { active = false; };
-  }, [search, role, page]);
+  }, [search, role, page, reload]);
 
   const pages = Math.max(1, Math.ceil(total / PER_PAGE));
 
   return (
     <div>
-      <h1 className="text-2xl font-bold text-gray-900 mb-1">Leads</h1>
+      <div className="mb-1 flex items-start justify-between gap-3">
+        <h1 className="text-2xl font-bold text-gray-900">Leads</h1>
+        <button onClick={() => setAdding(true)}
+          className="flex items-center gap-1.5 rounded-xl bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-700">
+          <FiPlus size={14} /> Add lead
+        </button>
+      </div>
       <p className="text-gray-500 text-sm mb-6">
         Everyone who has sent or received a shipment, one entry per phone number, with who they are connected to.
       </p>
@@ -132,7 +193,25 @@ export default function AdminLeads() {
         </div>
       )}
 
-      {openId && <LeadDetail startId={openId} onClose={() => setOpenId(null)} />}
+      {openId && <LeadDetail startId={openId} onClose={() => setOpenId(null)} onChanged={() => setReload((n) => n + 1)} />}
+
+      {adding && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white p-6 shadow-2xl">
+            <div className="mb-4 flex items-center justify-between">
+              <h2 className="font-bold text-gray-900">Add lead</h2>
+              <button onClick={() => setAdding(false)} aria-label="Close" className="text-gray-400 hover:text-gray-600"><FiX size={20} /></button>
+            </div>
+            <LeadForm submitLabel="Add lead" onCancel={() => setAdding(false)}
+              onSubmit={async (form) => {
+                await createAdminLead(form);
+                toast.success("Lead added.");
+                setAdding(false);
+                setReload((n) => n + 1);
+              }} />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -163,21 +242,24 @@ function PeopleList({ title, tone, people, empty, onOpen }) {
   );
 }
 
-function LeadDetail({ startId, onClose }) {
+function LeadDetail({ startId, onClose, onChanged }) {
   const [trail, setTrail] = useState([startId]);       // lets you step back after jumping to a connection
   const currentId = trail[trail.length - 1];
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(false);
+  const [version, setVersion] = useState(0);
 
   useEffect(() => {
     let active = true;
     setLoading(true);
+    setEditing(false);
     getAdminLead(currentId)
       .then((res) => active && setData(res.data))
       .catch(() => { if (active) { toast.error("Could not load this lead."); onClose(); } })
       .finally(() => active && setLoading(false));
     return () => { active = false; };
-  }, [currentId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [currentId, version]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const open = (id) => setTrail((t) => [...t, id]);
   const lead = data?.lead;
@@ -200,7 +282,23 @@ function LeadDetail({ startId, onClose }) {
           <div className="p-10 text-center text-gray-400">Loading…</div>
         ) : (
           <div className="space-y-6 p-6 text-sm">
-            <div className="rounded-xl bg-gray-50 p-4">
+            {editing ? (
+              <div className="rounded-xl border border-gray-200 p-4">
+                <LeadForm initial={lead} submitLabel="Save changes" onCancel={() => setEditing(false)}
+                  onSubmit={async (form) => {
+                    await updateAdminLead(lead.id, form);
+                    toast.success("Lead updated.");
+                    setEditing(false);
+                    setVersion((v) => v + 1);
+                    onChanged?.();
+                  }} />
+              </div>
+            ) : (
+            <div className="relative rounded-xl bg-gray-50 p-4">
+              <button onClick={() => setEditing(true)}
+                className="absolute right-3 top-3 flex items-center gap-1 rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-xs font-semibold text-gray-600 hover:bg-gray-100">
+                <FiEdit2 size={12} /> Edit
+              </button>
               <p className="flex items-center gap-2 text-gray-900"><FiPhone size={14} /> {lead.phone}</p>
               <p className="mt-1 flex items-start gap-2 text-gray-600"><FiMapPin size={14} className="mt-0.5 flex-shrink-0" /> {place(lead)}</p>
               {lead.address && <p className="mt-1 pl-6 text-xs text-gray-400">{lead.address}</p>}
@@ -209,6 +307,7 @@ function LeadDetail({ startId, onClose }) {
                 last seen {lead.last_seen_at ? new Date(lead.last_seen_at).toLocaleDateString() : "—"}
               </p>
             </div>
+            )}
 
             <div className="grid gap-5 md:grid-cols-2">
               <PeopleList title={`Sends to (${data.sends_to.length})`} tone="text-blue-700" people={data.sends_to}
