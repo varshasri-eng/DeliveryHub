@@ -10,8 +10,12 @@
 -- The service copies its booking-form settings and fields from Air Cargo (slug air-cargo-india-to-usa),
 -- so it behaves the same way. It is added right after Air Cargo in the services list.
 --
--- RUN (no variable needed):
---   docker compose exec -T postgres psql -U deliveryhub_user -d deliveryhub < db/migrations/023_personal_items_ups_service.sql
+-- Your existing service is "personal shipments" (slug personal-shipments). The file fills THAT service.
+-- (If the slug does not exist yet, it creates a new "Personal Items" service with that slug.)
+--
+-- RUN:
+--   docker compose exec -T postgres psql -U deliveryhub_user -d deliveryhub \
+--       -v svc_slug=personal-shipments < db/migrations/023_personal_items_ups_service.sql
 -- Safe to re-run: existing rows are updated, missing ones are added.
 
 \set ON_ERROR_STOP on
@@ -21,7 +25,7 @@ BEGIN;
 INSERT INTO service_types
     (name, slug, route_direction, badge_label, tagline, description, icon,
      enable_quantity, is_active, display_order, created_at, updated_at)
-SELECT 'Personal Items', 'personal-items-india-to-usa', 'IN_TO_US', 'UPS',
+SELECT 'Personal Items', :'svc_slug', 'IN_TO_US', 'UPS',
        'Send personal items from India to the USA with UPS',
        'Ship personal items from anywhere in India to the USA with UPS. Rates are pan-India and include GST, free pickup and packing.',
        '🧳',
@@ -30,13 +34,16 @@ FROM (SELECT 1) AS one
 LEFT JOIN service_types a ON a.slug = 'air-cargo-india-to-usa'
 ON CONFLICT (slug) DO NOTHING;
 
+-- The per-kg slabs need "Enable quantity" turned on
+UPDATE service_types SET enable_quantity = true WHERE slug = :'svc_slug';
+
 -- 2) Booking-form fields, copied from Air Cargo
 INSERT INTO service_fields (service_type_id, label, field_key, field_type, options, display_order)
 SELECT n.id, f.label, f.field_key, f.field_type, f.options, f.display_order
 FROM service_types n
 JOIN service_types a ON a.slug = 'air-cargo-india-to-usa'
 JOIN service_fields f ON f.service_type_id = a.id
-WHERE n.slug = 'personal-items-india-to-usa'
+WHERE n.slug = :'svc_slug'
   AND NOT EXISTS (SELECT 1 FROM service_fields x WHERE x.service_type_id = n.id AND x.field_key = f.field_key);
 
 -- 3) Weight options and UPS prices
@@ -89,21 +96,21 @@ UPDATE service_pricing_tiers t
 SET price_inr = r.price_inr, description = r.description, display_order = r.order_no,
     min_quantity = r.min_quantity, max_quantity = r.max_quantity
 FROM ups_rates r, service_types s
-WHERE s.id = t.service_type_id AND s.slug = 'personal-items-india-to-usa' AND t.tier_name = r.tier_name;
+WHERE s.id = t.service_type_id AND s.slug = :'svc_slug' AND t.tier_name = r.tier_name;
 
 INSERT INTO service_pricing_tiers
     (service_type_id, tier_name, description, price, price_inr, display_order, min_quantity, max_quantity)
 SELECT s.id, r.tier_name, r.description, 0, r.price_inr, r.order_no, r.min_quantity, r.max_quantity
 FROM ups_rates r
 CROSS JOIN service_types s
-WHERE s.slug = 'personal-items-india-to-usa'
+WHERE s.slug = :'svc_slug'
   AND NOT EXISTS (SELECT 1 FROM service_pricing_tiers t WHERE t.service_type_id = s.id AND t.tier_name = r.tier_name);
 
 -- UPS as the carrier on every weight option
 UPDATE service_subservices x
 SET price_inr = r.price_inr
 FROM service_pricing_tiers t, service_types s, ups_rates r
-WHERE x.pricing_tier_id = t.id AND s.id = t.service_type_id AND s.slug = 'personal-items-india-to-usa'
+WHERE x.pricing_tier_id = t.id AND s.id = t.service_type_id AND s.slug = :'svc_slug'
   AND x.name = 'UPS' AND r.tier_name = t.tier_name;
 
 INSERT INTO service_subservices (pricing_tier_id, name, price, price_inr, icon, display_order)
@@ -111,7 +118,7 @@ SELECT t.id, 'UPS', 0, r.price_inr, '✈️', 1
 FROM service_pricing_tiers t
 JOIN service_types s ON s.id = t.service_type_id
 JOIN ups_rates r ON r.tier_name = t.tier_name
-WHERE s.slug = 'personal-items-india-to-usa'
+WHERE s.slug = :'svc_slug'
   AND NOT EXISTS (SELECT 1 FROM service_subservices x WHERE x.pricing_tier_id = t.id AND x.name = 'UPS');
 
 -- 4) What is included, and what is not allowed
@@ -123,7 +130,7 @@ CROSS JOIN (VALUES
     (2, 'GST, free pickup and packing included'),
     (3, 'Shipped with UPS')
 ) AS n(ord, text)
-WHERE s.slug = 'personal-items-india-to-usa'
+WHERE s.slug = :'svc_slug'
   AND NOT EXISTS (SELECT 1 FROM service_coverage_items q WHERE q.service_type_id = s.id AND q.text = n.text);
 
 INSERT INTO service_restrictions (service_type_id, text, display_order)
@@ -134,15 +141,15 @@ CROSS JOIN (VALUES
     (2, 'Electronics are charged Rs 50 extra per kg.'),
     (3, 'The higher of actual weight and volumetric weight is charged. Volumetric weight = length x height x width (cm) / 5000.')
 ) AS n(ord, text)
-WHERE s.slug = 'personal-items-india-to-usa'
+WHERE s.slug = :'svc_slug'
   AND NOT EXISTS (SELECT 1 FROM service_restrictions q WHERE q.service_type_id = s.id AND q.text = n.text);
 
 COMMIT;
 
--- Check: 39 weight options, each with one UPS price
+-- Check: 39 weight options with one UPS price each (more weight options = tiers that were already on the service)
 SELECT s.name, s.slug, s.enable_quantity, count(DISTINCT t.id) AS weight_options, count(x.id) AS ups_prices
 FROM service_types s
 LEFT JOIN service_pricing_tiers t ON t.service_type_id = s.id
 LEFT JOIN service_subservices x ON x.pricing_tier_id = t.id AND x.name = 'UPS'
-WHERE s.slug = 'personal-items-india-to-usa'
+WHERE s.slug = :'svc_slug'
 GROUP BY s.name, s.slug, s.enable_quantity;
