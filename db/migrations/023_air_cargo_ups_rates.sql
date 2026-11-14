@@ -16,6 +16,7 @@
 -- RUN:
 --   docker compose exec -T postgres psql -U deliveryhub_user -d deliveryhub \
 --       -v svc_slug=personal-shipments < db/migrations/023_personal_items_ups_service.sql
+-- Old placeholder options on the service (for example "Express") are removed unless a shipment uses them.
 -- Safe to re-run: existing rows are updated, missing ones are added.
 
 \set ON_ERROR_STOP on
@@ -105,6 +106,14 @@ FROM ups_rates r
 CROSS JOIN service_types s
 WHERE s.slug = :'svc_slug'
   AND NOT EXISTS (SELECT 1 FROM service_pricing_tiers t WHERE t.service_type_id = s.id AND t.tier_name = r.tier_name);
+
+-- Remove the old placeholder options on this service (e.g. "Express" with Same Day / Next Day), unless an
+-- existing shipment already uses one of them
+DELETE FROM service_pricing_tiers t
+USING service_types s
+WHERE s.id = t.service_type_id AND s.slug = :'svc_slug'
+  AND t.tier_name NOT IN (SELECT tier_name FROM ups_rates)
+  AND NOT EXISTS (SELECT 1 FROM shipments sh WHERE sh.pricing_tier_id = t.id);
 
 -- UPS as the carrier on every weight option
 UPDATE service_subservices x
