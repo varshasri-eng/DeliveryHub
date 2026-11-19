@@ -6,6 +6,7 @@ import { getService } from "../api/services";
 import { createShipment, createGuestShipment, validateOfferCode, getPostalLookup } from "../api/shipments";
 import { useAuth } from "../context/AuthContext";
 import { formatMoney } from "../utils/money";
+import usePageMeta from "../utils/pageMeta";
 import { downloadShipmentSummary } from "../utils/shipmentSummary";
 
 const money = (n, currencyCode) => formatMoney(n, currencyCode);
@@ -382,6 +383,12 @@ export default function BookShipmentPage() {
   const { customer } = useAuth();
 
   const [service, setService] = useState(null);
+  usePageMeta(
+    service ? `${service.name}: ${service.route_direction === "IN_TO_US" ? "India to USA" : "USA to India"} | DeliveryHub` : "Book a shipment | DeliveryHub",
+    service
+      ? `Book ${service.name} from ${service.route_direction === "IN_TO_US" ? "India to the USA" : "the USA to India"} with DeliveryHub. ${service.tagline || "Choose your weight and carrier and see the price straight away."}`
+      : "Book a shipment between the USA and India with DeliveryHub."
+  );
   const [notFound, setNotFound] = useState(false);
   const [loadError, setLoadError] = useState("");
   const [sender, setSender] = useState(emptyParty());

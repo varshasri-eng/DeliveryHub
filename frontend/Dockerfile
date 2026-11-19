@@ -1,12 +1,13 @@
-FROM node:20-alpine
-
+# ---- Stage 1: build the site once ----
+FROM node:20-alpine AS build
 WORKDIR /app
-
-COPY package.json .
+COPY package*.json ./
 RUN npm install
-
 COPY . .
+RUN npm run build
 
-EXPOSE 3000
-
-CMD ["npm", "run", "dev"]
+# ---- Stage 2: serve the built files with nginx (no dev server) ----
+FROM nginx:1.27-alpine
+COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY --from=build /app/dist /usr/share/nginx/html
+EXPOSE 80

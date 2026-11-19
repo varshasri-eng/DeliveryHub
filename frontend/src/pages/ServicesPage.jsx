@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { FiArrowRight, FiGlobe, FiPackage, FiTruck } from "react-icons/fi";
 import { getServices } from "../api/services";
 import Reveal from "../components/Reveal";
+import usePageMeta from "../utils/pageMeta";
 
 const DIRECTIONS = [
   { id: "US_TO_IN", label: "United States to India" },
@@ -10,6 +11,7 @@ const DIRECTIONS = [
 ];
 
 export default function ServicesPage() {
+  usePageMeta("Shipping Services: USA to India and India to USA | DeliveryHub", "See DeliveryHub shipping services and prices between the USA and India.");
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedDirection = searchParams.get("direction") || "";
   const direction = DIRECTIONS.some((option) => option.id === requestedDirection)

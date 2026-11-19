@@ -39,6 +39,7 @@ def create_app():
     from app.routes.admin_shipments import admin_shipments_bp
     from app.routes.admin_leads import admin_leads_bp
     from app.routes.admin_revenue import admin_revenue_bp
+    from app.routes.seo import seo_bp
     from app.routes.admin_offers import admin_offers_bp
     from app.routes.households import households_bp
     from app.routes.settings import settings_bp
@@ -55,6 +56,7 @@ def create_app():
     app.register_blueprint(admin_shipments_bp, url_prefix="/api/admin/shipments")
     app.register_blueprint(admin_leads_bp, url_prefix="/api/admin/leads")
     app.register_blueprint(admin_revenue_bp, url_prefix="/api/admin/revenue")
+    app.register_blueprint(seo_bp, url_prefix="/api")
     app.register_blueprint(admin_offers_bp, url_prefix="/api/admin/offer-codes")
     app.register_blueprint(households_bp, url_prefix="/api/households")
     app.register_blueprint(settings_bp,   url_prefix="/api/settings")

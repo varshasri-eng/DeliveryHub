@@ -10,8 +10,9 @@ services:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
 
+    # only reachable from this server, not from the internet
     ports:
-      - "5440:5432"
+      - "127.0.0.1:5440:5432"
 
     volumes:
       - delivery_hub_pgdata:/var/lib/postgresql/data
@@ -46,9 +47,11 @@ services:
       SMTP_PASSWORD: ${SMTP_PASSWORD}
       SMTP_FROM: ${SMTP_FROM}
 
+    # only reachable from this server; the website reaches it through the frontend container
     ports:
-      - "5010:5000"
+      - "127.0.0.1:5010:5000"
 
+    # keeps uploaded files (logo, QR codes, labels) on the server's disk
     volumes:
       - ./backend:/app
 
@@ -56,7 +59,7 @@ services:
       postgres:
         condition: service_healthy
 
-    command: python wsgi.py
+    # (the start command, gunicorn, is now in backend/Dockerfile)
 
 
   frontend:
@@ -64,15 +67,9 @@ services:
     container_name: delivery_hub_frontend
     restart: unless-stopped
 
-    environment:
-      VITE_API_URL: ""
-
+    # the built site is served by nginx on port 80 inside the container
     ports:
-      - "4010:3000"
-
-    volumes:
-      - ./frontend:/app
-      - /app/node_modules
+      - "4010:80"
 
     depends_on:
       - backend

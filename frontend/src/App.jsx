@@ -1,50 +1,51 @@
+import { lazy, Suspense } from "react";
 import { Routes, Route, Navigate, useLocation } from "react-router-dom";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { BrandingProvider } from "./context/BrandingContext";
 import WhatsAppPlaceholder from "./components/WhatsAppPlaceholder";
 
-// Public pages
+// Public pages: the home page loads at once, every other page loads only when it is opened
 import LandingPage from "./pages/LandingPage";
 
 // Auth pages
-import Login         from "./pages/Login";
-import Register      from "./pages/Register";
-import ForgotPassword from "./pages/ForgotPassword";
-import ResetPassword from "./pages/ResetPassword";
-import AdminLogin    from "./pages/admin/AdminLogin";
-import AdminRegister from "./pages/admin/AdminRegister";
+const Login = lazy(() => import("./pages/Login"));
+const Register = lazy(() => import("./pages/Register"));
+const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const AdminLogin = lazy(() => import("./pages/admin/AdminLogin"));
+const AdminRegister = lazy(() => import("./pages/admin/AdminRegister"));
 
 // Customer account pages
-import Home          from "./pages/account/Home";
-import Profile       from "./pages/account/Profile";
-import Addresses     from "./pages/account/Addresses";
-import Shipments from "./pages/account/Shipments";
-import FamilyGroup   from "./pages/account/FamilyGroup";
-import Notifications from "./pages/account/Notifications";
-import Settings      from "./pages/account/Settings";
+const Home = lazy(() => import("./pages/account/Home"));
+const Profile = lazy(() => import("./pages/account/Profile"));
+const Addresses = lazy(() => import("./pages/account/Addresses"));
+const Shipments = lazy(() => import("./pages/account/Shipments"));
+const FamilyGroup = lazy(() => import("./pages/account/FamilyGroup"));
+const Notifications = lazy(() => import("./pages/account/Notifications"));
+const Settings = lazy(() => import("./pages/account/Settings"));
 
 // Admin pages
-import CustomerList    from "./pages/admin/CustomerList";
-import CustomerDetail  from "./pages/admin/CustomerDetail";
-import StaffManagement from "./pages/admin/StaffManagement";
-import AdminBrandingPage from "./pages/admin/AdminBrandingPage";
-import PaymentSettingsPage from "./pages/admin/PaymentSettingsPage";
+const CustomerList = lazy(() => import("./pages/admin/CustomerList"));
+const CustomerDetail = lazy(() => import("./pages/admin/CustomerDetail"));
+const StaffManagement = lazy(() => import("./pages/admin/StaffManagement"));
+const AdminBrandingPage = lazy(() => import("./pages/admin/AdminBrandingPage"));
+const PaymentSettingsPage = lazy(() => import("./pages/admin/PaymentSettingsPage"));
 
 // Layouts
 import CustomerLayout from "./components/CustomerLayout";
 import AdminLayout    from "./components/AdminLayout";
 import GuestLayout    from "./components/GuestLayout";
-import PageView from "./pages/PageView";
-import ServicesPage from "./pages/ServicesPage";
-import ServiceDetailPage from "./pages/ServiceDetailPage";
-import BookShipmentPage from "./pages/BookShipmentPage";
-import AdminPages from "./pages/admin/AdminPages";
-import AdminShipments from "./pages/admin/AdminShipments";
-import AdminLeads from "./pages/admin/AdminLeads";
-import AdminRevenue from "./pages/admin/AdminRevenue";
-import AdminServices from "./pages/admin/AdminServices";
-import AdminOffers from "./pages/admin/AdminOffers";
-import TrackShipmentPage from "./pages/TrackShipmentPage";
+const PageView = lazy(() => import("./pages/PageView"));
+const ServicesPage = lazy(() => import("./pages/ServicesPage"));
+const ServiceDetailPage = lazy(() => import("./pages/ServiceDetailPage"));
+const BookShipmentPage = lazy(() => import("./pages/BookShipmentPage"));
+const AdminPages = lazy(() => import("./pages/admin/AdminPages"));
+const AdminShipments = lazy(() => import("./pages/admin/AdminShipments"));
+const AdminLeads = lazy(() => import("./pages/admin/AdminLeads"));
+const AdminRevenue = lazy(() => import("./pages/admin/AdminRevenue"));
+const AdminServices = lazy(() => import("./pages/admin/AdminServices"));
+const AdminOffers = lazy(() => import("./pages/admin/AdminOffers"));
+const TrackShipmentPage = lazy(() => import("./pages/TrackShipmentPage"));
 
 // The WhatsApp chat button is for visitors and customers, not the admin panel
 function ChatButton() {
@@ -84,6 +85,7 @@ export default function App() {
     <AuthProvider>
       <BrandingProvider>
       <>
+      <Suspense fallback={<div className="min-h-[60vh]" />}>
       <Routes>
 
         {/* ── Public (no auth) ───────────────────────── */}
@@ -142,6 +144,7 @@ export default function App() {
         <Route path="*"  element={<Navigate to="/" replace />} />
 
       </Routes>
+      </Suspense>
       <ChatButton />
       </>
       </BrandingProvider>

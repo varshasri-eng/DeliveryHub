@@ -7,6 +7,7 @@ import StaticPageContent from "../components/StaticPageContent";
 import Reveal from "../components/Reveal";
 import { useBranding } from "../context/BrandingContext";
 import { formatMoney } from "../utils/money";
+import usePageMeta from "../utils/pageMeta";
 
 const WHATSAPP_URL = "https://wa.me/15107146946";
 const PHONE_DISPLAY = "+1 510 714 6946";
@@ -48,6 +49,10 @@ const FEATURES = [
 ];
 
 export default function LandingPage() {
+  usePageMeta(
+    "DeliveryHub | Shipping Between the USA and India: Air Cargo, Documents and Courier",
+    "Ship parcels, documents and personal items between the USA and India with DeliveryHub. Air cargo and courier with FedEx, DHL and UPS, clear prices, online booking and shipment tracking."
+  );
   const navigate = useNavigate();
   const { hash } = useLocation();
   const { settings } = useBranding();

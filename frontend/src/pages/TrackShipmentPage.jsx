@@ -6,6 +6,7 @@ import { getPaymentSettings } from "../api/settings";
 import { paymentForRoute } from "../utils/paymentRoute";
 import { formatMoney } from "../utils/money";
 import Reveal from "../components/Reveal";
+import usePageMeta from "../utils/pageMeta";
 
 const STATUS_LABELS = {
   requested: "Requested",
@@ -160,6 +161,7 @@ function InvoiceSection({ shipment, onUpdated }) {
 }
 
 export default function TrackShipmentPage() {
+  usePageMeta("Track your shipment | DeliveryHub", "Track your DeliveryHub shipment between the USA and India with your shipment number.");
   const [shipmentNumber, setShipmentNumber] = useState("");
   const [shipment, setShipment] = useState(null);
   const [error, setError] = useState("");

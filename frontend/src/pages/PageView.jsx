@@ -2,11 +2,14 @@ import { useEffect, useState } from "react";
 import { useParams, Link, Navigate } from "react-router-dom";
 import api from "../api/client";
 import StaticPageContent from "../components/StaticPageContent";
+import usePageMeta from "../utils/pageMeta";
 
 export default function PageView() {
   const { slug } = useParams();
   const [page, setPage] = useState(null);
   const [notFound, setNotFound] = useState(false);
+
+  usePageMeta(page ? `${page.title} | DeliveryHub` : "DeliveryHub", "");
 
   useEffect(() => {
     setPage(null);

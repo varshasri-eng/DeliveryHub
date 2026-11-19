@@ -9,4 +9,6 @@ COPY . .
 
 EXPOSE 5000
 
-CMD ["python", "wsgi.py"]
+# Production server (gunicorn) instead of Flask's debug server.
+# --preload starts the app once (tables and catalog are set up once), then the workers copy it.
+CMD ["gunicorn", "--workers", "2", "--threads", "4", "--preload", "--timeout", "60", "--bind", "0.0.0.0:5000", "--access-logfile", "-", "wsgi:app"]
