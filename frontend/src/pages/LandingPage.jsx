@@ -43,25 +43,32 @@ function categoryOf(service) {
 
 // Look of each kind of service card. To use real photos later: add the images
 // to frontend/public/images/services/ (documents.jpg, air.jpg, ...) and set USE_PHOTOS to true.
-const USE_PHOTOS = false;
+// Turn each one on (true) after its photo is in frontend/public/images/services/.
+const PHOTOS = { documents: true, air: true, sea: true, personal: true, medical: false, other: false };
+// Hero photo, used when no hero banner is uploaded in Admin > Branding. Set to "" to show the illustration.
+const HERO_PHOTO = "/images/hero.jpg";
 const VISUALS = {
   documents: {
     Icon: FiFileText,
+    pos: "65% 60%",
     gradient: "from-[#102E27] via-brand-800 to-brand-600",
     blurb: "Send important papers with tracking and a price shown before you book.",
   },
   air: {
     Icon: FiSend,
+    pos: "center 45%",
     gradient: "from-[#0f3b4a] via-[#1b6a78] to-brand-500",
     blurb: "Speed-first shipping for personal goods and parcels.",
   },
   sea: {
     Icon: FiAnchor,
+    pos: "center 55%",
     gradient: "from-[#13304f] via-[#2a5d86] to-[#5fa3b8]",
     blurb: "An economical option for eligible shipments that are not urgent.",
   },
   personal: {
     Icon: FiGift,
+    pos: "center 30%",
     gradient: "from-[#102E27] via-brand-700 to-brand-400",
     blurb: "Send personal items and gifts from India to the USA.",
   },
@@ -109,10 +116,15 @@ function ServiceCard({ service, featured, wide, index }) {
         to={`/services/${service.slug}`}
         className={`group flex h-full overflow-hidden rounded-3xl border border-gray-100 bg-white shadow-sm transition-all duration-300 hover:-translate-y-1.5 hover:shadow-2xl hover:shadow-brand-900/10 motion-reduce:transform-none ${wide ? "flex-col md:flex-row" : "flex-col"}`}
       >
-        <div className={`relative overflow-hidden bg-gradient-to-br ${visual.gradient} ${wide ? "min-h-[190px] md:min-h-full md:w-2/5" : "h-44"}`}>
-          {USE_PHOTOS && (
-            <img src={`/images/services/${category}.jpg`} alt="" loading="lazy"
-              className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-110" />
+        <div className={`relative overflow-hidden bg-gradient-to-br ${visual.gradient} ${wide ? "min-h-[220px] md:min-h-full md:w-2/5" : "h-52"}`}>
+          {PHOTOS[category] && (
+            <>
+              <img src={`/images/services/${category}.jpg`} alt="" loading="lazy"
+                style={{ objectPosition: visual.pos || "center" }}
+                onError={(event) => { event.currentTarget.style.display = "none"; }}
+                className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-110" />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/45 via-black/5 to-black/25" />
+            </>
           )}
           <div className="absolute -right-10 -top-10 h-44 w-44 rounded-full border-[26px] border-white/[0.07]" />
           <div className="absolute -bottom-12 -left-8 h-40 w-40 rounded-full bg-white/10 blur-2xl" />
@@ -190,6 +202,7 @@ export default function LandingPage() {
     });
   }, [hash, staticPagesLoading]);
 
+  const heroImage = settings.hero_banner_url || HERO_PHOTO;
   const phoneText = settings.contact_phone || PHONE_DISPLAY;
   const phoneTel = settings.contact_phone ? settings.contact_phone.replace(/[^\d+]/g, "") : PHONE_TEL;
   const routeLabel = DIRECTIONS.find((option) => option.id === direction)?.label;
@@ -276,9 +289,9 @@ export default function LandingPage() {
           </div>
 
           <div className="relative mx-auto w-full max-w-xl page-hero-art">
-            {settings.hero_banner_url ? (
+            {heroImage ? (
               <div className="relative min-h-[360px] overflow-hidden rounded-[2rem] bg-brand-900 shadow-2xl shadow-black/30 sm:min-h-[460px]">
-                <img src={settings.hero_banner_url} alt="DeliveryHub international shipping"
+                <img src={heroImage} alt="DeliveryHub international shipping"
                   className="absolute inset-0 h-full w-full object-cover" />
                 <div className="absolute inset-0 bg-gradient-to-t from-gray-950/75 via-gray-950/10 to-transparent" />
                 <div className="absolute bottom-7 left-7 right-7 text-white">
