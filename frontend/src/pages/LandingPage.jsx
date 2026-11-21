@@ -44,7 +44,7 @@ function categoryOf(service) {
 // Look of each kind of service card. To use real photos later: add the images
 // to frontend/public/images/services/ (documents.jpg, air.jpg, ...) and set USE_PHOTOS to true.
 // Turn each one on (true) after its photo is in frontend/public/images/services/.
-const PHOTOS = { documents: true, air: true, sea: true, personal: true, medical: false, other: false };
+const PHOTOS = { documents: true, air: true, sea: true, personal: true, medical: true, other: false };
 // Hero photo, used when no hero banner is uploaded in Admin > Branding. Set to "" to show the illustration.
 const HERO_PHOTO = "/images/hero.jpg";
 const VISUALS = {
