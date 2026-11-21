@@ -1,10 +1,9 @@
-import { useState, useEffect } from "react";
+-import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import toast from "react-hot-toast";
-import { FiPackage, FiSearch, FiArrowRight, FiClock } from "react-icons/fi";
+import { FiPackage, FiClock } from "react-icons/fi";
 import { getServices } from "../../api/services";
 import { getMyShipments } from "../../api/shipments";
-import { useBranding } from "../../context/BrandingContext";
+import { ShippingHero, ServicesShowcase } from "../../components/ShippingShowcase";
 
 const STATUS_LABELS = {
   requested: "Requested",
@@ -24,122 +23,45 @@ const STATUS_COLORS = {
 
 export default function Home() {
   const navigate = useNavigate();
-  const { settings } = useBranding();
   const [services, setServices] = useState([]);
+  const [servicesLoading, setServicesLoading] = useState(true);
+  const [servicesError, setServicesError] = useState(false);
   const [shipments, setShipments] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [direction, setDirection] = useState("US_TO_IN");
 
   useEffect(() => {
-    Promise.all([
-      getServices().catch(() => ({ data: { services: [] } })),
-      getMyShipments().catch(() => ({ data: { shipments: [] } })),
-    ])
-      .then(([servicesRes, shipmentsRes]) => {
-        setServices(servicesRes.data.services || []);
-        setShipments((shipmentsRes.data.shipments || []).slice(0, 5));
-      })
-      .catch(() => toast.error("Failed to load your dashboard."))
+    getServices()
+      .then((res) => setServices(res.data.services || []))
+      .catch(() => setServicesError(true))
+      .finally(() => setServicesLoading(false));
+    getMyShipments()
+      .then((res) => setShipments((res.data.shipments || []).slice(0, 5)))
+      .catch(() => setShipments([]))
       .finally(() => setLoading(false));
   }, []);
 
   return (
-    <div className="max-w-5xl mx-auto">
-      {/* Banner */}
-      {settings.hero_banner_url && (
-        <div className="relative rounded-2xl overflow-hidden mb-6">
-          <img
-            src={settings.hero_banner_url}
-            alt=""
-            className="w-full h-auto object-contain"
-            onError={(e) => { e.currentTarget.parentElement.style.display = "none"; }}
-          />
-          {(settings.hero_title || settings.hero_subtitle) && (
-            <div className="absolute inset-0 bg-black/30 flex flex-col items-center
-                            justify-center text-center px-4">
-              {settings.hero_title && (
-                <h2 className="text-xl sm:text-2xl font-bold text-white drop-shadow-sm">
-                  {settings.hero_title}
-                </h2>
-              )}
-              {settings.hero_subtitle && (
-                <p className="text-sm text-white/90 mt-1.5 max-w-md drop-shadow-sm">
-                  {settings.hero_subtitle}
-                </p>
-              )}
-            </div>
-          )}
-        </div>
-      )}
+    <div className="max-w-6xl mx-auto">
+      <ShippingHero
+        variant="account"
+        direction={direction}
+        onDirectionChange={setDirection}
+        title={<>Welcome back. <span className="text-brand-300">Ready to ship?</span></>}
+        subtitle="Book a shipment or check on one already on its way."
+      />
 
-      <h1 className="text-2xl font-bold text-gray-900 mb-1">Welcome back 👋</h1>
-      <p className="text-gray-500 text-sm mb-6">
-        Book a shipment or check on one already on its way.
-      </p>
+      <ServicesShowcase
+        variant="account"
+        services={services}
+        loading={servicesLoading}
+        error={servicesError}
+        direction={direction}
+        onDirectionChange={setDirection}
+      />
 
-      {/* Quick actions */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-8">
-        <button
-          onClick={() => navigate("/services")}
-          className="flex items-center justify-between bg-gray-900 hover:bg-gray-800
-                     text-white rounded-2xl p-5 transition-colors text-left"
-        >
-          <div>
-            <p className="font-semibold">Book a Shipment</p>
-            <p className="text-sm text-white/70 mt-0.5">Browse our services</p>
-          </div>
-          <FiArrowRight size={20} />
-        </button>
-        <button
-          onClick={() => navigate("/track")}
-          className="flex items-center justify-between bg-white border border-gray-200
-                     hover:border-gray-300 rounded-2xl p-5 transition-colors text-left"
-        >
-          <div>
-            <p className="font-semibold text-gray-900">Track a Shipment</p>
-            <p className="text-sm text-gray-500 mt-0.5">Check delivery status</p>
-          </div>
-          <FiSearch size={20} className="text-gray-400" />
-        </button>
-      </div>
-
-      {/* Services grid */}
-      {!loading && services.length > 0 && (
-        <div className="mb-8">
-          <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3">
-            Our Services
-          </p>
-          {[
-            { id: "US_TO_IN", label: "United States → India" },
-            { id: "IN_TO_US", label: "India → United States" },
-          ].map((direction) => {
-            const directionServices = services.filter(
-              (service) => service.route_direction === direction.id,
-            );
-            if (directionServices.length === 0) return null;
-            return (
-              <div key={direction.id} className="mb-5 last:mb-0">
-                <p className="mb-2 text-sm font-semibold text-gray-700">{direction.label}</p>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                  {directionServices.map((service) => (
-                    <button
-                      key={service.id}
-                      onClick={() => navigate(`/services/${service.slug}`)}
-                      className="bg-white border border-gray-100 rounded-xl p-4 text-center
-                                 hover:border-brand-300 hover:shadow-sm transition-all"
-                    >
-                      <span className="text-2xl block mb-2">{service.icon || "📦"}</span>
-                      <span className="text-sm font-medium text-gray-800">{service.name}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      )}
-
-      {/* Recent shipments */}
-      <div>
+      <div className="mt-12">
+        {/* Recent shipments */}
         <div className="flex items-center justify-between mb-3">
           <p className="text-sm font-semibold text-gray-500 uppercase tracking-wide">
             Recent Shipments
