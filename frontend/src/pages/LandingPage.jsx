@@ -44,7 +44,7 @@ function categoryOf(service) {
 // Look of each kind of service card. To use real photos later: add the images
 // to frontend/public/images/services/ (documents.jpg, air.jpg, ...) and set USE_PHOTOS to true.
 // Turn each one on (true) after its photo is in frontend/public/images/services/.
-const PHOTOS = { documents: true, air: true, sea: true, personal: true, medical: true, other: false };
+const PHOTOS = { documents: true, air: true, sea: true, personal: true, medical: false, other: false };
 // Hero photo, used when no hero banner is uploaded in Admin > Branding. Set to "" to show the illustration.
 const HERO_PHOTO = "/images/hero.jpg";
 const VISUALS = {
@@ -458,7 +458,15 @@ export default function LandingPage() {
             { key: "air", Icon: FiSend, title: "Air shipping", tag: "Faster", text: "For customers prioritizing speed.", gradient: VISUALS.air.gradient, service: airService },
             { key: "sea", Icon: FiAnchor, title: "Sea shipping", tag: "Economical", text: "For eligible shipments where economy matters.", gradient: VISUALS.sea.gradient, service: seaService },
           ].map((method) => (
-            <div key={method.key} className={`group relative overflow-hidden rounded-3xl bg-gradient-to-br ${method.gradient} p-8 text-white shadow-xl shadow-brand-900/10`}>
+            <div key={method.key} className={`group relative min-h-[340px] overflow-hidden rounded-3xl bg-gradient-to-br ${method.gradient} p-8 text-white shadow-xl shadow-brand-900/10`}>
+              {PHOTOS[method.key] && (
+                <>
+                  <img src={`/images/services/${method.key}.jpg`} alt="" loading="lazy"
+                    onError={(event) => { event.currentTarget.style.display = "none"; }}
+                    className="absolute inset-0 h-full w-full object-cover transition-transform duration-700 group-hover:scale-105" />
+                  <div className="absolute inset-0 bg-gradient-to-br from-black/85 via-black/55 to-black/15" />
+                </>
+              )}
               <div className="absolute -right-12 -top-12 h-52 w-52 rounded-full border-[28px] border-white/[0.07] transition-transform duration-700 group-hover:scale-125" />
               <span className="relative flex h-14 w-14 items-center justify-center rounded-2xl bg-white/15 backdrop-blur-sm"><method.Icon size={26} /></span>
               <span className="relative mt-6 inline-block rounded-full bg-white/15 px-3 py-1 text-[10px] font-bold uppercase tracking-wider">{method.tag}</span>
