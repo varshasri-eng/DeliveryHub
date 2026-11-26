@@ -6,6 +6,8 @@ import { getPaymentSettings } from "../api/settings";
 import { paymentForRoute } from "../utils/paymentRoute";
 import { formatMoney } from "../utils/money";
 import Reveal from "../components/Reveal";
+import BrandLogo from "../components/BrandLogo";
+import { useBranding } from "../context/BrandingContext";
 import usePageMeta from "../utils/pageMeta";
 
 const STATUS_LABELS = {
@@ -24,6 +26,7 @@ const INVOICE_STATUS = {
 };
 
 function InvoiceSection({ shipment, onUpdated }) {
+  const { settings } = useBranding();
   const invoice = shipment.invoice;
   const currency = shipment.currency_code || "USD";
   const [payment, setPayment] = useState(null);
@@ -63,7 +66,27 @@ function InvoiceSection({ shipment, onUpdated }) {
   return (
     <div className="mt-8 border-t border-gray-100 pt-6" id="invoice">
       <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+        <div className="w-full">
+          <div className="mb-5 flex flex-wrap items-center justify-between gap-3 rounded-2xl bg-gray-50 p-4">
+            <div className="flex items-center gap-3">
+              <BrandLogo size="lg" />
+              <div>
+                <p className="text-base font-extrabold text-gray-950">{settings.site_name}</p>
+                {settings.contact_phone && (
+                  <a href={`tel:${settings.contact_phone}`} className="text-sm text-gray-600 hover:text-brand-700">
+                    {settings.contact_phone}
+                  </a>
+                )}
+              </div>
+            </div>
+            {shipment.billed_to && (
+              <div className="text-right">
+                <p className="text-xs font-bold uppercase tracking-[0.16em] text-gray-400">Billed to</p>
+                <p className="text-sm font-bold text-gray-900">{shipment.billed_to}</p>
+              </div>
+            )}
+          </div>
+
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-brand-700">Invoice</p>
           <h3 className="mt-1 text-xl font-extrabold text-gray-950">{invoice.invoice_number}</h3>
           {invoice.issued_at && (

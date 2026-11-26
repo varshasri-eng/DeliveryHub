@@ -841,6 +841,14 @@ def submit_tracked_payment_proof(shipment_number):
     return _save_payment_proof(shipment.invoice)
 
 
+def _masked_name(name):
+    """'Varsha Velagala' -> 'Varsha V.' so the public page never shows a full name."""
+    parts = (name or "").split()
+    if not parts:
+        return None
+    return parts[0] if len(parts) == 1 else f"{parts[0]} {parts[-1][0]}."
+
+
 def _public_invoice(invoice):
     """Invoice fields safe to show on the public tracking page (no proof file path or notes)."""
     if not invoice:
@@ -866,11 +874,14 @@ def _public_invoice(invoice):
 # ── PUBLIC TRACKING ──────────────────────────────────────────
 # No auth required — anyone with the shipment number can check status.
 # Returns only non-sensitive fields: never addresses, phone numbers,
-# or who booked it (the invoice amounts/line items are included on purpose).
+# or who booked it (the invoice amounts/line items are included on purpose;
+# the billed-to name is masked to first name + last initial).
 # The shipment_number itself is an unguessable random token (see generate_shipment_number), which is the only
 # protection this needs for a first version.
 @shipments_bp.route("/track/<shipment_number>", methods=["GET"])
 def track_shipment(shipment_number):
+    from app.models.customer import Customer
+
     shipment = Shipment.query.filter_by(shipment_number=shipment_number).first()
     if not shipment:
         return jsonify({"error": "No shipment found with that number."}), 404
@@ -885,6 +896,9 @@ def track_shipment(shipment_number):
             "created_at": shipment.created_at.isoformat() if shipment.created_at else None,
             "updated_at": shipment.updated_at.isoformat() if shipment.updated_at else None,
             "currency_code": shipment.currency_code or "USD",
+            "billed_to": _masked_name(
+                Customer.query.get(shipment.customer_id).name if shipment.customer_id else None
+            ),
             "route_direction": shipment.route_direction,
             # The FedEx link is only shown to customers while the parcel is in transit.
             "tracking_number": shipment.tracking_number if shipment.status == "in_transit" else None,
