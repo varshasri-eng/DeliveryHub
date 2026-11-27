@@ -4,6 +4,7 @@ import { FiArrowUpRight, FiMenu, FiX } from "react-icons/fi";
 import { useBranding } from "../context/BrandingContext";
 import BrandLogo from "./BrandLogo";
 import Footer from "./Footer";
+import OfferPopup from "./OfferPopup";
 
 export default function GuestLayout() {
   const { settings } = useBranding();
@@ -102,6 +103,7 @@ export default function GuestLayout() {
         </div>
       </main>
 
+      <OfferPopup />
       <Footer />
     </div>
   );

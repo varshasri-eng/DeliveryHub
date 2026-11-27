@@ -83,6 +83,9 @@ export default function AdminLayout() {
           <NavLink to="/admin/offer-codes" className={navClass}>
             <FiTag /> Offer Codes
           </NavLink>
+          <NavLink to="/admin/offer-links" className={navClass}>
+            <FiTag /> Offer Links
+          </NavLink>
           <NavLink to="/admin/staff" className={navClass}>
             <FiShield /> Staff
           </NavLink>

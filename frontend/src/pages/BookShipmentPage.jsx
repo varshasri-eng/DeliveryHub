@@ -377,6 +377,18 @@ function DynamicField({ field, value, onChange, error, showError }) {
   );
 }
 
+// Applies the ?offer=CODE from an offer link once a price is selected (runs once).
+function AutoApplyOffer({ code, ready, apply }) {
+  const done = useRef(false);
+  useEffect(() => {
+    if (code && ready && !done.current) {
+      done.current = true;
+      apply();
+    }
+  }, [code, ready]); // eslint-disable-line react-hooks/exhaustive-deps
+  return null;
+}
+
 export default function BookShipmentPage() {
   const { slug } = useParams();
   const [searchParams] = useSearchParams();
@@ -394,7 +406,7 @@ export default function BookShipmentPage() {
   const [sender, setSender] = useState(emptyParty());
   const [receiver, setReceiver] = useState(emptyParty());
   const [fieldValues, setFieldValues] = useState({});
-  const [offerCodeInput, setOfferCodeInput] = useState("");
+  const [offerCodeInput, setOfferCodeInput] = useState((searchParams.get("offer") || "").trim().toUpperCase());
   const [appliedOffer, setAppliedOffer] = useState(null);
   const [validatingOffer, setValidatingOffer] = useState(false);
   const [showErrors, setShowErrors] = useState(false);
@@ -1026,6 +1038,7 @@ export default function BookShipmentPage() {
               </div>
             )}
             <div className="border-t border-gray-100 pt-2">
+              <AutoApplyOffer code={searchParams.get("offer")} ready={!!tier && selectedPrice != null} apply={applyOfferCode} />
               <label htmlFor="offer-code" className="mb-1 block text-xs font-semibold text-gray-600">
                 Offer code
               </label>

@@ -45,6 +45,7 @@ const AdminLeads = lazy(() => import("./pages/admin/AdminLeads"));
 const AdminRevenue = lazy(() => import("./pages/admin/AdminRevenue"));
 const AdminServices = lazy(() => import("./pages/admin/AdminServices"));
 const AdminOffers = lazy(() => import("./pages/admin/AdminOffers"));
+const AdminOfferLinks = lazy(() => import("./pages/admin/AdminOfferLinks"));
 const TrackShipmentPage = lazy(() => import("./pages/TrackShipmentPage"));
 
 // The WhatsApp chat button is for visitors and customers, not the admin panel
@@ -137,6 +138,7 @@ export default function App() {
           <Route path="shipments" element={<AdminShipments />} />
           <Route path="services" element={<AdminServices />} />
           <Route path="offer-codes" element={<AdminOffers />} />
+          <Route path="offer-links" element={<AdminOfferLinks />} />
           <Route path="pages" element={<AdminPages />} />
         </Route>
 
