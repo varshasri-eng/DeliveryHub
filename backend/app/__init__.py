@@ -46,7 +46,7 @@ def create_app():
     from app.routes.settings import settings_bp
     from app.routes.payment_settings import payment_settings_bp
     from app.routes.pages import pages_bp, admin_pages_bp
-    from app.models.offer_link import OfferLink
+    
 
     app.register_blueprint(auth_bp,       url_prefix="/api/auth")
     app.register_blueprint(customers_bp,  url_prefix="/api/customers")
