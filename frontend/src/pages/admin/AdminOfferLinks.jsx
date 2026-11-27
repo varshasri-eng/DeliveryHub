@@ -100,10 +100,10 @@ export default function AdminOfferLinks() {
 
   return (
     <div className="mx-auto max-w-5xl">
-      <h1 className="text-2xl font-extrabold text-gray-900">Offer links and pop-up</h1>
+      <h1 className="text-2xl font-extrabold text-gray-900">Offer links and banner</h1>
       <p className="mt-1 text-sm text-gray-500">
-        A link opens one service with the offer code already applied. Add an image to also show it as a pop-up.
-        Only the newest active pop-up is shown at a time.
+        A link opens one service with the offer code already applied. Add an image to also show it as a banner under the hero on the landing page and customer home.
+        Only the newest active banner is shown at a time. Clicking the image opens the link.
       </p>
 
       <form onSubmit={save} className="mt-6 grid gap-4 rounded-2xl border border-gray-100 bg-white p-5 shadow-sm md:grid-cols-2">
@@ -119,12 +119,12 @@ export default function AdminOfferLinks() {
             {services.map((s) => <option key={s.slug} value={s.slug}>{s.name} ({s.route_direction === "IN_TO_US" ? "India → USA" : "USA → India"})</option>)}
           </select>
         </label>
-        <label className="text-sm font-semibold text-gray-700 md:col-span-2">Pop-up headline (optional)
+        <label className="text-sm font-semibold text-gray-700 md:col-span-2">Banner headline (optional)
           <input value={form.headline} onChange={set("headline")} maxLength={150} placeholder="e.g. Diwali special: 10% off document shipping" className={`${input} mt-1`} />
         </label>
 
         <div className="md:col-span-2">
-          <p className="text-sm font-semibold text-gray-700">Pop-up image</p>
+          <p className="text-sm font-semibold text-gray-700">Banner image</p>
           <div className="mt-1 flex flex-wrap items-center gap-4">
             <input type="file" accept="image/png,image/jpeg,image/webp"
               onChange={(e) => { setFile(e.target.files?.[0] || null); setRemoveImage(false); }}
@@ -135,20 +135,20 @@ export default function AdminOfferLinks() {
               </label>
             )}
           </div>
-          <p className="mt-1 text-xs text-gray-400">PNG, JPG or WebP, up to 5 MB. A portrait or square image around 800×1000 px works best.</p>
+          <p className="mt-1 text-xs text-gray-400">PNG, JPG or WebP, up to 5 MB. A wide image around 1600×500 px works best.</p>
           {preview && <img src={preview} alt="" className="mt-3 max-h-48 rounded-xl border border-gray-100" />}
         </div>
 
         <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
-          <input type="checkbox" checked={form.show_popup} onChange={set("show_popup")} /> Show as pop-up on landing, services and home
+          <input type="checkbox" checked={form.show_popup} onChange={set("show_popup")} /> Show as banner on landing page and customer home
         </label>
         <label className="flex items-center gap-2 text-sm font-semibold text-gray-700">
           <input type="checkbox" checked={form.is_active} onChange={set("is_active")} /> Link active
         </label>
-        <label className="text-sm font-semibold text-gray-700">Pop-up starts (optional)
+        <label className="text-sm font-semibold text-gray-700">Banner starts (optional)
           <input type="datetime-local" value={form.popup_start} onChange={set("popup_start")} className={`${input} mt-1`} />
         </label>
-        <label className="text-sm font-semibold text-gray-700">Pop-up ends (optional)
+        <label className="text-sm font-semibold text-gray-700">Banner ends (optional)
           <input type="datetime-local" value={form.popup_end} onChange={set("popup_end")} className={`${input} mt-1`} />
         </label>
 
@@ -171,7 +171,7 @@ export default function AdminOfferLinks() {
               <p className="text-sm font-bold text-gray-900">{l.code} · {l.discount_percent}% off → {l.service_slug}</p>
               <p className="truncate text-xs text-gray-500">{window.location.origin}{l.link}</p>
               <p className="mt-1 text-xs text-gray-500">
-                {l.is_active ? "Active" : "Inactive"} · {l.show_popup ? "Pop-up on" : "No pop-up"}
+                {l.is_active ? "Active" : "Inactive"} · {l.show_popup ? "Banner on" : "No banner"}
                 {l.popup_start || l.popup_end ? ` · ${l.popup_start ? new Date(l.popup_start).toLocaleDateString() : "now"} to ${l.popup_end ? new Date(l.popup_end).toLocaleDateString() : "no end"}` : ""}
               </p>
             </div>

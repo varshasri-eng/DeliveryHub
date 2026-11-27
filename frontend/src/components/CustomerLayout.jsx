@@ -11,7 +11,6 @@ import {
 import { useState } from "react";
 import BrandLogo from "./BrandLogo";
 import Footer from "./Footer";
-import OfferPopup from "./OfferPopup";
 
 const NAV_ITEMS = [
   {
@@ -193,7 +192,6 @@ export default function CustomerLayout() {
           <Outlet />
         </main>
 
-        <OfferPopup />
         <Footer />
       </div>
     </div>

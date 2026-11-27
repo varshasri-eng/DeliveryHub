@@ -4,6 +4,7 @@ import {
   FiActivity, FiAnchor, FiArrowRight, FiCheckCircle, FiFileText, FiGift, FiPackage, FiSend,
 } from "react-icons/fi";
 import Reveal from "./Reveal";
+import OfferBanner from "./OfferBanner";
 import { useBranding } from "../context/BrandingContext";
 import { formatMoney } from "../utils/money";
 
@@ -144,6 +145,7 @@ export function ShippingHero({ direction, onDirectionChange, variant = "landing"
   const routeLabel = DIRECTIONS.find((option) => option.id === direction)?.label;
 
   return (
+    <>
     <section className={`relative isolate overflow-hidden bg-[#102E27] text-white ${compact ? "rounded-[2rem] shadow-xl shadow-brand-900/15" : ""}`}>
       <div className="pointer-events-none absolute -right-40 -top-48 h-[34rem] w-[34rem] rounded-full bg-brand-500/25 blur-3xl" />
       <div className="pointer-events-none absolute -bottom-56 -left-40 h-[30rem] w-[30rem] rounded-full bg-[#E8B65C]/10 blur-3xl" />
@@ -278,6 +280,8 @@ export function ShippingHero({ direction, onDirectionChange, variant = "landing"
       </svg>
       )}
     </section>
+    <OfferBanner compact={compact} />
+    </>
   );
 }
 
